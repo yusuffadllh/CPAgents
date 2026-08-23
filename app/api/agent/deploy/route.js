@@ -48,12 +48,21 @@ export async function POST(request) {
     // Build a deploy-only instruction listing only the platforms whose token
     // is configured. The tokens themselves are injected as env vars by
     // runOpencode, so the model never sees or prints them.
-    const vercelNameFlag = projectName ? ` --name "${projectName}"` : '';
     const deployTargets = [];
     if (settings.vercelToken) {
-      deployTargets.push(
-        `- Vercel (env VERCEL_TOKEN is set): run \`npx --yes vercel deploy --prod --yes${vercelNameFlag} --token="$VERCEL_TOKEN"\` from the project root. Vercel auto-detects the framework.${projectName ? ` The site should be reachable at https://${projectName}.vercel.app once live.` : ''}`,
-      );
+      // `vercel link` first so a re-deploy overwrites the same project instead of
+      // creating a new one (the old `--name` flag is deprecated and unreliable).
+      const vercelSteps = projectName
+        ? [
+            `- Vercel (env VERCEL_TOKEN is set), run these two commands from the project root:`,
+            `  1. \`npx --yes vercel link --yes --project "${projectName}" --token="$VERCEL_TOKEN"\` — links this directory to the project "${projectName}", creating it only if it does not exist yet. This is what makes a re-deploy overwrite the SAME project.`,
+            `  2. \`npx --yes vercel deploy --prod --yes --token="$VERCEL_TOKEN"\` — do NOT pass --name, it is deprecated.`,
+            `  The site will be reachable at https://${projectName}.vercel.app once live.`,
+          ]
+        : [
+            `- Vercel (env VERCEL_TOKEN is set): run \`npx --yes vercel deploy --prod --yes --token="$VERCEL_TOKEN"\` from the project root. Vercel auto-detects the framework.`,
+          ];
+      deployTargets.push(...vercelSteps);
     }
     if (settings.netlifyToken) {
       deployTargets.push(
@@ -75,10 +84,18 @@ export async function POST(request) {
             ...deployTargets,
             `- The credentials are already provided via environment variables. Do NOT ask for tokens or logins, and NEVER print token values.`,
             projectName
-              ? `- The desired project/site name is "${projectName}". Try to make the deployed URL use it (e.g. Vercel: pass --name "${projectName}", or add a vercel.json with {"name":"${projectName}"}, or rename the deploy). If the platform ignores the name, that's OK — just report whatever final URL it gives.`
+              ? `- The desired project/site name is "${projectName}". On Vercel this is set by \`vercel link --project "${projectName}"\` (see above), NOT by --name and NOT by a "name" key in vercel.json. If a project with that name already exists it will be reused and this deploy overwrites its production — that is the intended behaviour.`
               : `- Let the platform pick the project name automatically.`,
             `- Install dependencies and build only if the platform needs it. Keep every command small.`,
             `- If a deploy command fails, read the error and try the correct fix once; do not loop forever.`,
+            `VERCEL vercel.json RULES (read carefully, these cause silent 404s):`,
+            `- If vercel.json uses a "services" object, every service is PRIVATE by default. You MUST add a TOP-LEVEL "rewrites" array that exposes it, e.g. {"rewrites":[{"source":"/(.*)","destination":{"service":"frontend"}}]}. A "rewrites" array placed INSIDE a service only runs after the request already entered that service, so without the top-level rewrite the whole site returns 404 even though the build succeeds.`,
+            `- In "services" mode the keys buildCommand, installCommand, outputDirectory, framework, devCommand, ignoreCommand and functions are NOT allowed at the top level; move them inside the relevant service. "framework" must be a string (e.g. "vite", "nextjs"), never null.`,
+            `- The "name" property in vercel.json is deprecated; do not add it.`,
+            `- For a simple single-app project, prefer NO "services" key at all — just top-level buildCommand/outputDirectory/framework.`,
+            `VERIFY BEFORE REPORTING SUCCESS:`,
+            `- After the deploy reports Ready, run \`curl -s -o /dev/null -w "%{http_code}" <live-url>\` on the final URL.`,
+            `- If the status is 404 or 5xx, the deploy is NOT done: diagnose (usually routing/output directory), fix the config, redeploy, and re-check. Only report success once the URL returns 200 (or 3xx to a working page).`,
             `- At the very end, print the final live URL on its own line prefixed with "LIVE URL: ".`,
             `- Do NOT explore hidden/system folders. Work only in the current directory.`,
           ].join('\n'),
@@ -157,11 +174,33 @@ export async function POST(request) {
             || rawOutput.match(/https?:\/\/[^\s"']+\.(?:vercel\.app|netlify\.app)[^\s"']*/i);
           const liveUrl = urlMatch ? (urlMatch[1] || urlMatch[0]) : null;
 
-          const header = exitCode === 0
-            ? `✅ Deploy selesai (exit ${exitCode}).`
-            : `⚠️ Deploy selesai dengan exit code ${exitCode}.`;
+          // A green build does not mean a working site: a bad vercel.json routing
+          // table still deploys fine but serves 404 on every path.
+          let urlStatus = null;
+          if (liveUrl && /^https?:\/\//i.test(liveUrl)) {
+            try {
+              const check = await fetch(liveUrl, { redirect: 'follow' });
+              urlStatus = check.status;
+              if (urlStatus >= 400) {
+                sendEvent('log', {
+                  message: `⚠️ URL merespons HTTP ${urlStatus} — deploy terbangun tapi situs belum bisa diakses (biasanya routing/output directory di vercel.json salah).`,
+                });
+              } else {
+                sendEvent('log', { message: `✅ URL merespons HTTP ${urlStatus}.` });
+              }
+            } catch (e) {
+              sendEvent('log', { message: `⚠️ Tidak bisa memverifikasi URL: ${e.message}` });
+            }
+          }
 
-          const urlLine = liveUrl ? `\n\n🌐 **Live URL:** ${liveUrl}` : '';
+          const deployOk = exitCode === 0 && (urlStatus === null || urlStatus < 400);
+          const header = deployOk
+            ? `✅ Deploy selesai (exit ${exitCode}).`
+            : `⚠️ Deploy selesai dengan exit code ${exitCode}${urlStatus >= 400 ? `, tapi URL mengembalikan HTTP ${urlStatus}` : ''}.`;
+
+          const urlLine = liveUrl
+            ? `\n\n🌐 **Live URL:** ${liveUrl}${urlStatus ? ` (HTTP ${urlStatus})` : ''}`
+            : '';
           const formattedOutput = `${header}${urlLine}\n\n**Deploy Output:**\n\`\`\`text\n${truncated || '(tidak ada output)'}\n\`\`\``;
 
           try {
@@ -176,7 +215,7 @@ export async function POST(request) {
 
           if (liveUrl) sendEvent('log', { message: `🌐 Live URL: ${liveUrl}` });
           sendEvent('log', { message: '🏁 Deploy selesai.' });
-          sendEvent('done', { liveUrl });
+          sendEvent('done', { liveUrl, urlStatus, ok: deployOk });
           finish();
         } catch (error) {
           sendEvent('error', { error: 'Internal server error', details: error.message });

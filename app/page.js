@@ -454,13 +454,17 @@ export default function Home() {
                 setLiveLogs(prev => prev + data.message + '\n');
               } else if (data.type === 'done') {
                 if (data.liveUrl) {
-                  setLiveLogs(prev => prev + `\n🌐 Live URL: ${data.liveUrl}\n`);
+                  setLiveLogs(prev => prev + `\n🌐 Live URL: ${data.liveUrl}${data.urlStatus ? ` (HTTP ${data.urlStatus})` : ''}\n`);
                 }
-                // Mark the deploy marker task done so the loop treats deploy as
-                // finished and never tries to run/re-deploy it.
-                setTasks(prev => prev.map(t =>
-                  DEPLOY_TASK_RE.test(t.description || '') ? { ...t, status: 'COMPLETED' } : t
-                ));
+                // Only close the deploy marker when the URL actually serves content;
+                // a green build with a 404 URL must stay open so the user can retry.
+                if (data.ok !== false) {
+                  setTasks(prev => prev.map(t =>
+                    DEPLOY_TASK_RE.test(t.description || '') ? { ...t, status: 'COMPLETED' } : t
+                  ));
+                } else {
+                  setLiveLogs(prev => prev + `⚠️ Deploy belum benar-benar live. Perbaiki konfigurasi lalu klik Deploy lagi.\n`);
+                }
                 isDone = true;
               } else if (data.type === 'error') {
                 setLiveLogs(prev => prev + `❌ ${data.error}: ${data.details || ''}\n`);
