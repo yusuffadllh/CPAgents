@@ -47,6 +47,10 @@ export default function Home() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [projectName, setProjectName] = useState('');
 
+  const [showRevise, setShowRevise] = useState(false);
+  const [reviseText, setReviseText] = useState('');
+  const [isRevising, setIsRevising] = useState(false);
+
   // Live Logs for the current session
   const [liveLogs, setLiveLogs] = useState('');
 
@@ -389,6 +393,42 @@ export default function Home() {
     autoRetriesRef.current = 0;
     setLoopCount(0);
     setIsStopped(false);
+  };
+
+  // Turn the user's feedback on the deployed result into a fresh plan. The old
+  // unfinished backlog is dropped server-side so the revision runs first.
+  const handleRevise = async () => {
+    if (!sessionId || isRevising || !reviseText.trim()) return;
+
+    handleStop();
+    setIsRevising(true);
+    try {
+      const res = await fetch('/api/agent/revise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, feedback: reviseText }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.details ? `${data.error}\n\n${data.details}` : `Error: ${data.error}`);
+        return;
+      }
+
+      setTasks(data.tasks || []);
+      setReviseText('');
+      setShowRevise(false);
+      setLiveLogs(`📝 Revisi diterima: ${data.removed} task lama dibuang, ${data.added} task revisi dibuat.\n`);
+
+      autoRetriesRef.current = 0;
+      forceLoopRef.current = true;
+      setLoopCount(0);
+      setIsStopped(false);
+    } catch (e) {
+      console.error('Gagal mengirim revisi', e);
+      alert(`Gagal mengirim revisi: ${e.message}`);
+    } finally {
+      setIsRevising(false);
+    }
   };
 
   const handleDeploy = async () => {
@@ -763,6 +803,13 @@ export default function Home() {
                       </button>
                     )}
                     <button
+                      onClick={() => setShowRevise(v => !v)}
+                      title="Sudah lihat hasilnya? Tulis apa yang perlu diperbaiki — task lama yang belum jalan akan dibuang."
+                      style={{ background: showRevise ? '#c2185b' : '#e91e63', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                      📝 Revisi
+                    </button>
+                    <button
                       onClick={() => setShowFiles(true)}
                       title="Lihat isi folder project ini"
                       style={{ background: '#2196f3', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' }}
@@ -792,6 +839,37 @@ export default function Home() {
                       📦 Export Workspace ZIP
                     </a>
                   </div>
+
+                  {showRevise && (
+                    <div className="animate-fade-in" style={{ marginTop: '0.75rem', padding: '1rem', background: 'var(--input-bg)', border: '1px solid var(--surface-border)', borderRadius: '10px' }}>
+                      <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '0.5rem' }}>
+                        Tulis apa yang kurang dari hasil yang sudah kamu lihat. Sertakan data asli (link GitHub/LinkedIn, nama, bio) supaya agent tidak mengarang.
+                        Task yang belum jalan akan dibuang, lalu revisi ini dikerjakan lebih dulu.
+                      </div>
+                      <textarea
+                        value={reviseText}
+                        onChange={(e) => setReviseText(e.target.value)}
+                        placeholder={'Contoh:\n- Ganti semua placeholder dengan data asli saya:\n  GitHub: https://github.com/yusuffadllh\n  LinkedIn: https://linkedin.com/in/...\n- Hero section masih polos, bikin lebih menarik\n- Di HP layoutnya rusak, bagian project kepotong'}
+                        rows={7}
+                        style={{ width: '100%', background: 'var(--surface-bg, rgba(0,0,0,0.2))', color: 'inherit', border: '1px solid var(--surface-border)', borderRadius: '8px', padding: '0.75rem', fontSize: '0.9rem', fontFamily: 'inherit', resize: 'vertical' }}
+                      />
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+                        <button
+                          onClick={handleRevise}
+                          disabled={isRevising || !reviseText.trim()}
+                          style={{ background: isRevising || !reviseText.trim() ? '#9e9e9e' : '#e91e63', color: 'white', border: 'none', padding: '0.5rem 1.2rem', borderRadius: '6px', cursor: isRevising || !reviseText.trim() ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
+                        >
+                          {isRevising ? '⏳ Menyusun task revisi...' : '✅ Kirim Revisi'}
+                        </button>
+                        <button
+                          onClick={() => setShowRevise(false)}
+                          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--surface-border)', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' }}
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -58,7 +58,13 @@ export async function POST(request) {
       }
     });
 
-    const systemPrompt = `You are an AI planner. The user will give you a goal. Break the goal down into the RIGHT number of high-level tasks based on its complexity — do NOT force a fixed count. A tiny task may need just 1-2 tasks; a normal feature 3-5; a large multi-part project 7-10 or more. Prefer splitting work into small, sequential, incremental steps rather than a few huge ones, because a reviewer loop will add follow-up tasks later as needed. You MUST respond with ONLY a valid JSON array of objects. Format: [{"description": "task 1"}, {"description": "task 2"}]`;
+    const systemPrompt = `You are an AI planner. The user will give you a goal. Break the goal down into the RIGHT number of high-level tasks based on its complexity — do NOT force a fixed count. A tiny task may need just 1-2 tasks; a normal feature 3-5; a large multi-part project 7-10 or more. Prefer splitting work into small, sequential, incremental steps rather than a few huge ones, because a reviewer loop will add follow-up tasks later as needed.
+
+COVERAGE: every concrete deliverable the user named (each page, section, feature, integration) must be traceable to at least one task. Do not silently drop a requested item, and do not merge many requested sections into one vague task like "build the UI".
+
+FIDELITY: carry the user's literal details into the task descriptions — exact URLs, names, section titles, colours, wording. If the user supplied personal data such as GitHub/LinkedIn links or a bio, restate it in the task that needs it so the executor uses the real value instead of inventing one. Never add a task that requires data the user did not provide.
+
+You MUST respond with ONLY a valid JSON array of objects. Format: [{"description": "task 1"}, {"description": "task 2"}]`;
 
     // Call gateway for Planner, retrying on transient 429/5xx ("busy").
     const response = await fetchChatWithRetry(`${settings.baseUrl}/chat/completions`, {

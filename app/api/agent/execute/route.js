@@ -88,6 +88,15 @@ export async function POST(request) {
       `- Actually create and modify real files and run the commands needed to COMPLETE this task now. Do not merely describe or propose.`,
       `- KEEP EVERY OUTPUT SMALL AND INCREMENTAL FROM THE START. Do NOT emit one big response or one giant file write — the tool call fails ("exit code 1" / JSON parse error) when a single payload is too large. Always begin with a small first chunk, then build up gradually with several follow-up edits/appends. Never emit a single write bigger than ~150 lines.`,
       `- Work only inside the current directory and only with files relevant to the goal.`,
+      `NEVER INVENT THE USER'S DATA:`,
+      `- Real personal data (name, bio, links to GitHub/LinkedIn/email, project list, work history, photos) may ONLY come from what the user wrote in the goal, or from files already in the working directory.`,
+      `- If a piece of that data was not given, do NOT make one up and do NOT write a fake placeholder like "John Doe", "lorem ipsum", "example.com", "https://github.com/username" or a stock avatar. Instead omit that element, or read the value from a single obvious content file (e.g. src/data/profile.json) so the user can fill it in later.`,
+      `- Never fabricate project descriptions, achievements, testimonials, statistics, or client logos.`,
+      `IF THIS TASK PRODUCES UI:`,
+      `- Mobile-first and fully responsive is mandatory. Every layout must work at 360px width with no horizontal scroll, and scale up cleanly to desktop. Use responsive utilities/media queries on every grid, flex row, font size and spacing — never a fixed pixel width on a container.`,
+      `- Do not ship a bare unstyled page. Apply a coherent visual design: a real colour palette, consistent spacing scale, readable typographic hierarchy, hover/focus states, and rounded/shadowed surfaces where appropriate. Aim for something a developer would be happy to show an employer.`,
+      `- Implement EVERY section the goal asks for. Before finishing, re-read the goal and check each requested section actually exists and is wired up. A missing section counts as an incomplete task.`,
+      `- Semantic HTML and basic a11y: real heading levels, alt text, labels on inputs, keyboard-focusable interactive elements.`,
       `- When the task is fully done, end IMMEDIATELY with a short summary of the concrete files you created/changed. Do not keep exploring after the deliverable exists.`,
     ].join('\n');
 
