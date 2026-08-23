@@ -10,6 +10,33 @@ export const dynamic = 'force-dynamic';
 // OpenCode's own maxTimeoutMs so the run isn't cut off by the HTTP route).
 export const maxDuration = 3600;
 
+// Count files under `dir` that were created/modified at or after `sinceMs`.
+// Skips the isolated OpenCode home dir and node_modules/.git so we only measure
+// real work the task produced. Used to catch "false completed" runs where the
+// model exits 0 without actually building anything.
+async function countChangedFiles(dir, sinceMs) {
+  let changed = 0;
+  const walk = async (d) => {
+    let entries;
+    try { entries = await fs.readdir(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const name = e.name;
+      if (name === 'node_modules' || name === '.git' || name.startsWith('.opencode')) continue;
+      const full = path.join(d, name);
+      if (e.isDirectory()) {
+        await walk(full);
+      } else {
+        try {
+          const st = await fs.stat(full);
+          if (st.mtimeMs >= sinceMs - 1000) changed += 1;
+        } catch { /* ignore */ }
+      }
+    }
+  };
+  await walk(dir);
+  return changed;
+}
+
 export async function POST(request) {
   try {
     const { sessionId, taskId } = await request.json();
@@ -141,6 +168,7 @@ export async function POST(request) {
 
           const capturedLines = [];
           let exitCode = 0;
+          const runStartedAt = Date.now();
 
           try {
             exitCode = await runOpencode({
@@ -192,15 +220,29 @@ export async function POST(request) {
           ];
           const outputLooksFailed = failureSignals.some((re) => re.test(rawOutput));
           const producedNoOutput = rawOutput.trim().length === 0;
-          const success = exitCode === 0 && !outputLooksFailed && !producedNoOutput;
+
+          // Real work must touch the filesystem. If the run exits 0 with no
+          // errors but created/modified NO files, the model almost certainly
+          // gave up or only "described" the work — a false completion.
+          let changedFiles = 0;
+          try { changedFiles = await countChangedFiles(workspaceDir, runStartedAt); } catch {}
+          // Planning/analysis tasks legitimately produce just a .md file, which
+          // the file walk still counts — so "0 changed files" is a reliable
+          // failure signal for any task type.
+          const producedNoFiles = changedFiles === 0;
+
+          const success =
+            exitCode === 0 && !outputLooksFailed && !producedNoOutput && !producedNoFiles;
 
           let header;
           if (success) {
-            header = `✅ OpenCode selesai (exit ${exitCode}).`;
+            header = `✅ OpenCode selesai (exit ${exitCode}, ${changedFiles} file dibuat/diubah).`;
           } else if (outputLooksFailed) {
             header = `❌ Task GAGAL — gateway/model menolak permintaan (cek API key & model di Settings). Silakan mulai ulang task ini.`;
           } else if (producedNoOutput) {
             header = `❌ Task GAGAL — OpenCode tidak menghasilkan output apa pun. Silakan mulai ulang task ini.`;
+          } else if (producedNoFiles) {
+            header = `❌ Task GAGAL — tidak ada file yang dibuat/diubah, jadi task ini belum benar-benar dikerjakan. Silakan mulai ulang task ini.`;
           } else {
             header = `❌ Task GAGAL — OpenCode keluar dengan exit code ${exitCode}. Silakan mulai ulang task ini.`;
           }
