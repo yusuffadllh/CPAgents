@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { fetchChatWithRetry } from '@/lib/context';
+import { fetchChatWithRetry, parseChatCompletion } from '@/lib/context';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -158,20 +158,9 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Failed to communicate with OpenRouter API', details: errorText }, { status: response.status });
     }
 
-    let data;
-    let rawText;
-    try {
-      console.log("Parsing response from AI provider...");
-      rawText = await response.text();
-      // Clean up trailing garbage like "data: [DONE]" that some providers append
-      let cleanedText = rawText;
-      const lastBraceIndex = cleanedText.lastIndexOf('}');
-      if (lastBraceIndex !== -1) {
-        cleanedText = cleanedText.substring(0, lastBraceIndex + 1);
-      }
-      data = JSON.parse(cleanedText);
-      console.log("AI provider response parsed successfully.");
-    } catch (parseError) {
+    const rawText = await response.text();
+    const data = parseChatCompletion(rawText);
+    if (!data) {
       console.error("Failed to parse JSON from AI provider. Raw response:", rawText);
       return NextResponse.json({ error: 'Invalid JSON from AI provider', details: rawText }, { status: 502 });
     }

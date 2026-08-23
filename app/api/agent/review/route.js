@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { buildBudgetedPrompt, fetchChatWithRetry } from '@/lib/context';
+import { buildBudgetedPrompt, fetchChatWithRetry, parseChatCompletion } from '@/lib/context';
 
 // Turn the model's reply into a task array, tolerating replies where the JSON
 // is wrapped in prose (e.g. "Every single... [ {..} ]"). Returns [] if none.
@@ -112,18 +112,10 @@ Respond ONLY with a valid JSON array of objects. Format: [{"description": "Refac
       return NextResponse.json({ error: 'Failed to communicate with API', details: errorText }, { status: response.status });
     }
 
-    let data;
-    let rawText;
-    try {
-      rawText = await response.text();
-      let cleanedText = rawText.trim();
-      const lastCurly = cleanedText.lastIndexOf('}');
-      if (lastCurly !== -1) {
-        cleanedText = cleanedText.substring(0, lastCurly + 1);
-      }
-      data = JSON.parse(cleanedText);
-    } catch (parseError) {
-      console.error(parseError);
+    const rawText = await response.text();
+    const data = parseChatCompletion(rawText);
+    if (!data) {
+      console.error('Failed to parse JSON from API. Raw response:', rawText);
       return NextResponse.json({ error: 'Invalid JSON from API', details: rawText }, { status: 502 });
     }
 
