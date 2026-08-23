@@ -180,16 +180,36 @@ export async function POST(request) {
             ? rawOutput.slice(-20000) + '\n... (log dipotong)'
             : rawOutput;
 
-          const success = exitCode === 0;
-          const header = success
-            ? `✅ OpenCode selesai (exit ${exitCode}).`
-            : `❌ Task GAGAL — OpenCode keluar dengan exit code ${exitCode}. Silakan mulai ulang task ini.`;
+          // OpenCode can exit 0 even when the run never produced any work — e.g.
+          // the gateway rejected auth (401) or the model stream errored. Treat
+          // those as FAILED so the task isn't falsely marked COMPLETED.
+          const failureSignals = [
+            /\bAI_APICallError\b/i,
+            /level=ERROR[^\n]*stream error/i,
+            /\[401\]|\bAuthentication Error\b|Invalid proxy server token/i,
+            /\bRateLimitError\b/i,
+            /\b5\d\d\]:/, // 5xx from the gateway
+          ];
+          const outputLooksFailed = failureSignals.some((re) => re.test(rawOutput));
+          const producedNoOutput = rawOutput.trim().length === 0;
+          const success = exitCode === 0 && !outputLooksFailed && !producedNoOutput;
+
+          let header;
+          if (success) {
+            header = `✅ OpenCode selesai (exit ${exitCode}).`;
+          } else if (outputLooksFailed) {
+            header = `❌ Task GAGAL — gateway/model menolak permintaan (cek API key & model di Settings). Silakan mulai ulang task ini.`;
+          } else if (producedNoOutput) {
+            header = `❌ Task GAGAL — OpenCode tidak menghasilkan output apa pun. Silakan mulai ulang task ini.`;
+          } else {
+            header = `❌ Task GAGAL — OpenCode keluar dengan exit code ${exitCode}. Silakan mulai ulang task ini.`;
+          }
 
           const formattedOutput = `${header}\n\n**OpenCode Output:**\n\`\`\`text\n${truncated || '(tidak ada output)'}\n\`\`\``;
 
-          // A non-zero exit means the run failed (e.g. a too-large tool payload).
-          // Mark it FAILED so the UI shows a clear failure the user can restart,
-          // instead of a misleading "completed".
+          // Mark FAILED on any real failure (non-zero exit, auth/stream error in
+          // the output, or no output) so the UI shows a clear failure the user
+          // can restart, instead of a misleading "completed".
           await prisma.task.updateMany({
             where: { id: taskId },
             data: { status: success ? 'COMPLETED' : 'FAILED', result: formattedOutput },

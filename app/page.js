@@ -87,6 +87,7 @@ export default function Home() {
 
     setExecutingSessions(prev => ({ ...prev, [currentSessionId]: true }));
     setLiveLogs('Menghubungkan ke server...\n');
+    setIsAtLogBottom(true);
     abortControllersRef.current[currentSessionId] = new AbortController();
     
     try {
@@ -285,7 +286,14 @@ export default function Home() {
       if (res.ok) {
         if (data.session) {
           setGoal(data.session.goal);
-          setTasks(data.tasks || []);
+          // If a task is stuck in RUNNING but this browser isn't actively
+          // executing the session, the previous run died mid-task. Reset it to
+          // PENDING so the loop can pick it up again on "Lanjutkan".
+          const rawTasks = data.tasks || [];
+          const tasksToShow = executingSessions[id]
+            ? rawTasks
+            : rawTasks.map(t => (t.status === 'RUNNING' ? { ...t, status: 'PENDING' } : t));
+          setTasks(tasksToShow);
           setHasSubmitted(true);
         } else {
           setTasks([]);
@@ -558,13 +566,31 @@ export default function Home() {
     return `${key.slice(0, 4)}••••${key.slice(-4)}`;
   };
 
-  // Auto-scroll live logs
+  // Auto-scroll live logs, but only when the user is already near the bottom.
+  // If they scrolled up to read earlier output, don't yank them back down;
+  // instead show a "jump to latest" button (isAtLogBottom === false).
   const logsEndRef = useRef(null);
+  const logsContainerRef = useRef(null);
+  const [isAtLogBottom, setIsAtLogBottom] = useState(true);
+
+  const handleLogsScroll = () => {
+    const el = logsContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setIsAtLogBottom(distanceFromBottom < 40);
+  };
+
+  const scrollLogsToBottom = () => {
+    const el = logsContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    setIsAtLogBottom(true);
+  };
+
   useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (isAtLogBottom && logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
-  }, [liveLogs]);
+  }, [liveLogs, isAtLogBottom]);
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', background: 'var(--bg-gradient)', color: 'var(--foreground)' }}>
@@ -799,21 +825,49 @@ export default function Home() {
                         </div>
                         
                         {task.status === 'RUNNING' && (
-                          <div style={{
-                            background: '#0d1117',
-                            color: '#00ff00',
-                            padding: '1rem',
-                            borderRadius: '8px',
-                            fontFamily: 'monospace',
-                            fontSize: '0.85rem',
-                            whiteSpace: 'pre-wrap',
-                            maxHeight: '300px',
-                            overflowY: 'auto',
-                            border: '1px solid #30363d',
-                            marginTop: '0.5rem'
-                          }}>
-                            {liveLogs || 'Menunggu AI...'}
-                            <div ref={logsEndRef} />
+                          <div style={{ position: 'relative', marginTop: '0.5rem' }}>
+                            <div
+                              ref={logsContainerRef}
+                              onScroll={handleLogsScroll}
+                              style={{
+                                background: '#0d1117',
+                                color: '#00ff00',
+                                padding: '1rem',
+                                borderRadius: '8px',
+                                fontFamily: 'monospace',
+                                fontSize: '0.85rem',
+                                whiteSpace: 'pre-wrap',
+                                maxHeight: '300px',
+                                overflowY: 'auto',
+                                border: '1px solid #30363d'
+                              }}>
+                              {liveLogs || 'Menunggu AI...'}
+                              <div ref={logsEndRef} />
+                            </div>
+                            {!isAtLogBottom && (
+                              <button
+                                onClick={scrollLogsToBottom}
+                                title="Ke log terbaru"
+                                style={{
+                                  position: 'absolute',
+                                  bottom: '0.75rem',
+                                  right: '0.75rem',
+                                  padding: '0.35rem 0.75rem',
+                                  borderRadius: '999px',
+                                  background: 'var(--accent)',
+                                  color: '#000',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}>
+                                ↓ Ke bawah
+                              </button>
+                            )}
                           </div>
                         )}
 
