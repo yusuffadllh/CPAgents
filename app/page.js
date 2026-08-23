@@ -35,6 +35,11 @@ export default function Home() {
   const MAX_AUTO_RETRIES = 3;
   const autoRetriesRef = useRef(0);
 
+  // Set when the user explicitly clicks "Lanjutkan": lets the loop run a review
+  // pass even when a deploy task is still pending, so the button always does
+  // something visible instead of instantly re-pausing.
+  const forceLoopRef = useRef(false);
+
   const [maxLoops, setMaxLoops] = useState(3);
   const [loopCount, setLoopCount] = useState(0);
   const [isReviewing, setIsReviewing] = useState(false);
@@ -202,6 +207,7 @@ export default function Home() {
   const executeReview = async () => {
     if (isStopped || isReviewing) return;
     setIsReviewing(true);
+    setLiveLogs(prev => prev + '🔍 Mengevaluasi hasil untuk mencari task lanjutan...\n');
     try {
       const res = await fetch('/api/agent/review', {
         method: 'POST',
@@ -213,16 +219,24 @@ export default function Home() {
         setTasks(data.tasks);
         fetchSessions(); // keep sidebar project progress in sync
         if (data.newTasksAdded) {
+          setLiveLogs(prev => prev + '➕ Evaluasi menambah task baru.\n');
           setLoopCount(prev => prev + 1);
         } else {
+          // No new work: stop the loop and say so, otherwise the button appears
+          // to do nothing at all.
+          setLiveLogs(prev => prev + 'ℹ️ Evaluasi tidak menemukan task baru — project dianggap selesai.\n');
           setLoopCount(Infinity);
+          setIsStopped(true);
         }
       } else if (!res.ok) {
         setIsStopped(true);
+        setLiveLogs(prev => prev + `❌ Evaluasi gagal: ${data.error || 'unknown'}\n`);
         alert(data.details ? `Gagal mengevaluasi: ${data.error}\n\n${data.details}` : `Gagal mengevaluasi: ${data.error}`);
       }
     } catch (err) {
       console.error(err);
+      setLiveLogs(prev => prev + `❌ Evaluasi error: ${err.message}\n`);
+      setIsStopped(true);
     } finally {
       setIsReviewing(false);
     }
@@ -332,6 +346,7 @@ export default function Home() {
       ));
     }
     autoRetriesRef.current = 0;
+    forceLoopRef.current = true;
     setLoopCount(0);
     setIsStopped(false);
   };
@@ -567,15 +582,22 @@ export default function Home() {
         }
       } else if (!hasPending && !hasRunning && !hasFailed && !isExecuting && !isReviewing) {
         autoRetriesRef.current = 0;
-        // All real work is done. If a deploy task is waiting, STOP the loop and
-        // let the user click Deploy — no more reviewing/looping.
-        if (pendingDeploy) {
+        // All real work is done. A waiting deploy task normally pauses the loop
+        // so the user can click Deploy — but if they explicitly asked to keep
+        // looping, honour that instead of immediately re-pausing (which looked
+        // like the button did nothing).
+        if (pendingDeploy && !forceLoopRef.current) {
           setLiveLogs(prev => prev + `✅ Semua task selesai. Siap deploy — klik tombol "🚀 Deploy" untuk menerbitkan.\n`);
           setIsStopped(true);
         } else {
           const limit = parseInt(maxLoops, 10);
           if (isNaN(limit) || loopCount < limit) {
+            forceLoopRef.current = false;
             executeReview();
+          } else {
+            forceLoopRef.current = false;
+            setLiveLogs(prev => prev + `⏹ Batas looping (${limit}) sudah tercapai. Naikkan "Max Loop" bila ingin agent terus menambah task.\n`);
+            setIsStopped(true);
           }
         }
       }
@@ -834,6 +856,54 @@ export default function Home() {
                 {/* Right Column: Execution Results */}
                 <div className="glass animate-fade-in" style={{ flex: 1, minWidth: 0, padding: '1.5rem', borderRadius: '12px', overflowY: 'auto', maxHeight: '70vh' }}>
                   <h3 style={{ marginBottom: '1rem', color: 'var(--accent)' }}>Hasil Eksekusi</h3>
+
+                  {/* Live log for activity that isn't tied to a RUNNING task
+                      (review/looping, deploy, pause messages) — without this the
+                      UI looks frozen when those run. */}
+                  {liveLogs && !tasks.some(t => t.status === 'RUNNING') && (
+                    <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                      <div
+                        ref={logsContainerRef}
+                        onScroll={handleLogsScroll}
+                        style={{
+                          background: '#0d1117',
+                          color: '#00ff00',
+                          padding: '1rem',
+                          borderRadius: '8px',
+                          fontFamily: 'monospace',
+                          fontSize: '0.85rem',
+                          whiteSpace: 'pre-wrap',
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          border: '1px solid #30363d'
+                        }}>
+                        {liveLogs}
+                        <div ref={logsEndRef} />
+                      </div>
+                      {!isAtLogBottom && (
+                        <button
+                          onClick={scrollLogsToBottom}
+                          title="Ke log terbaru"
+                          style={{
+                            position: 'absolute',
+                            bottom: '0.75rem',
+                            right: '0.75rem',
+                            padding: '0.35rem 0.75rem',
+                            borderRadius: '999px',
+                            background: 'var(--accent)',
+                            color: '#000',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                          }}>
+                          ↓ Ke bawah
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     {tasks.filter(t => t.result || t.status === 'RUNNING').map((task) => (
                       <div key={task.id} style={{
