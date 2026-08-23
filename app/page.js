@@ -306,9 +306,32 @@ export default function Home() {
     }
   };
 
-  // Resume the loop for the currently open project: clear stop + reset the loop
-  // counter so pending/incomplete tasks run again (and review can add more).
-  const handleContinueProject = () => {
+  // Resume the loop for the currently open project: reset any FAILED/stuck
+  // RUNNING tasks back to PENDING, clear the auto-retry budget + loop counter,
+  // then unpause so the loop actually picks work up again. Without resetting the
+  // retry budget, a project that already exhausted its retries would immediately
+  // re-pause (Stop flickers back to "Lanjutkan" and nothing runs).
+  const handleContinueProject = async () => {
+    const toReset = tasks.filter(t => t.status === 'FAILED' || t.status === 'RUNNING');
+    if (toReset.length > 0) {
+      try {
+        await Promise.all(
+          toReset.map(t =>
+            fetch('/api/agent/retry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId: t.id }),
+            })
+          )
+        );
+      } catch (e) {
+        console.error('Gagal mereset task sebelum lanjut', e);
+      }
+      setTasks(prev => prev.map(t =>
+        (t.status === 'FAILED' || t.status === 'RUNNING') ? { ...t, status: 'PENDING', result: null } : t
+      ));
+    }
+    autoRetriesRef.current = 0;
     setLoopCount(0);
     setIsStopped(false);
   };
