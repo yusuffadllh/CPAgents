@@ -206,13 +206,18 @@ export default function ChatPage() {
   };
 
   const handleDeleteSession = async (id) => {
-    if (confirm("Hapus obrolan ini?")) {
-      await fetch(`/api/chat?sessionId=${id}`, { method: 'DELETE' });
-      if (sessionId === id) {
-        handleNewChat();
-      }
-      fetchSessions();
+    if (!confirm("Hapus obrolan ini?")) return;
+    // Files live outside the DB, so deleting them is a separate opt-in choice.
+    const deleteFiles = confirm(
+      'Hapus juga semua file (upload/generated) sesi ini dari server?\n\n' +
+      'OK = hapus obrolan + file (permanen)\n' +
+      'Cancel = hapus obrolan saja'
+    );
+    await fetch(`/api/chat?sessionId=${id}&deleteFiles=${deleteFiles}`, { method: 'DELETE' });
+    if (sessionId === id) {
+      handleNewChat();
     }
+    fetchSessions();
   };
 
   useEffect(() => {

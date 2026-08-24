@@ -532,6 +532,13 @@ export default function Home() {
   const allTasksDone = tasks.length > 0 && pendingCount === 0 && failedCount === 0;
 
   const handleDeleteSession = async (id) => {
+    // Files live outside the DB, so deleting them is a separate opt-in choice.
+    const deleteFiles = confirm(
+      'Hapus juga semua file workspace sesi ini dari server?\n\n' +
+      'OK = hapus sesi + file (permanen, tidak bisa dikembalikan)\n' +
+      'Cancel = hapus sesi saja, file tetap tersimpan di server'
+    );
+
     if (abortControllersRef.current[id]) {
       abortControllersRef.current[id].abort();
       delete abortControllersRef.current[id];
@@ -547,7 +554,7 @@ export default function Home() {
     }
     
     try {
-      await fetch(`/api/chat?sessionId=${id}`, { method: 'DELETE' });
+      await fetch(`/api/chat?sessionId=${id}&deleteFiles=${deleteFiles}`, { method: 'DELETE' });
       fetchSessions();
     } catch (e) {
       console.error("Gagal menghapus sesi", e);

@@ -244,11 +244,29 @@ export async function GET(request) {
   }
 }
 
+// Remove the on-disk workspaces for a session. Rejects ids that are not plain
+// UUID-ish tokens so a crafted sessionId can never escape the project dir.
+async function removeWorkspaces(sessionId) {
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return [];
+  const removed = [];
+  for (const root of ['workspaces', 'chat-workspaces']) {
+    const dir = path.join(process.cwd(), root, sessionId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+      removed.push(`${root}/${sessionId}`);
+    } catch (e) {
+      console.error(`Failed to remove ${dir}:`, e.message);
+    }
+  }
+  return removed;
+}
+
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
-    
+    const deleteFiles = searchParams.get('deleteFiles') === 'true';
+
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
     }
@@ -257,7 +275,9 @@ export async function DELETE(request) {
     await prisma.task.deleteMany({ where: { sessionId } });
     await prisma.session.delete({ where: { id: sessionId } });
 
-    return NextResponse.json({ success: true });
+    const removed = deleteFiles ? await removeWorkspaces(sessionId) : [];
+
+    return NextResponse.json({ success: true, removed });
   } catch (error) {
     console.error("Delete session error:", error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

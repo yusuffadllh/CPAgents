@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start -p 3005",
     "lint": "next lint",
-    "db:wal": "node scripts/enable-wal.js"
+    "db:wal": "node scripts/enable-wal.js",
+    "ws:clean": "node scripts/clean-workspaces.js",
+    "ws:clean:delete": "node scripts/clean-workspaces.js --delete",
+    "ws:clean:all": "node scripts/clean-workspaces.js --all --delete"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",
