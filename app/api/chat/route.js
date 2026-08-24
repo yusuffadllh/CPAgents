@@ -248,12 +248,19 @@ export async function GET(request) {
 // UUID-ish tokens so a crafted sessionId can never escape the project dir.
 async function removeWorkspaces(sessionId) {
   if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return [];
+  const targets = [
+    path.join('workspaces', sessionId),
+    path.join('chat-workspaces', sessionId),
+    // OpenCode's isolated HOME lives NEXT TO the workspace (see lib/opencode.js)
+    // and is usually far larger than the workspace itself.
+    path.join('workspaces', `.opencode-home-${sessionId}`),
+  ];
   const removed = [];
-  for (const root of ['workspaces', 'chat-workspaces']) {
-    const dir = path.join(process.cwd(), root, sessionId);
+  for (const rel of targets) {
+    const dir = path.join(process.cwd(), rel);
     try {
       await fs.rm(dir, { recursive: true, force: true });
-      removed.push(`${root}/${sessionId}`);
+      removed.push(rel);
     } catch (e) {
       console.error(`Failed to remove ${dir}:`, e.message);
     }

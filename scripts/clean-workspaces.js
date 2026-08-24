@@ -37,7 +37,11 @@ for (const root of ROOTS) {
   for (const name of fs.readdirSync(base)) {
     const dir = path.join(base, name);
     if (!fs.statSync(dir).isDirectory()) continue;
-    if (ids.has(name)) {
+    // .opencode-home-<sessionId> belongs to the session named in its suffix.
+    const owner = name.startsWith('.opencode-home-')
+      ? name.slice('.opencode-home-'.length)
+      : name;
+    if (ids.has(owner)) {
       console.log(`KEEP   ${root}/${name}`);
       continue;
     }
