@@ -2,13 +2,16 @@
 //   node scripts/clean-workspaces.js          -> dry run (hanya melapor)
 //   node scripts/clean-workspaces.js --delete -> benar-benar menghapus
 //   node scripts/clean-workspaces.js --all --delete -> hapus SEMUA workspace
+//   tambahkan --cache untuk ikut menghapus .agent-cache (cache npm/pip bersama)
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 
 const DO_DELETE = process.argv.includes('--delete');
 const ALL = process.argv.includes('--all');
+const DROP_CACHE = process.argv.includes('--cache');
 const ROOTS = ['workspaces', 'chat-workspaces'];
+const SHARED_CACHE = '.agent-cache';
 
 function liveSessionIds() {
   const file = (process.env.DATABASE_URL || 'file:./dev.db').replace(/^file:/, '');
@@ -37,6 +40,11 @@ for (const root of ROOTS) {
   for (const name of fs.readdirSync(base)) {
     const dir = path.join(base, name);
     if (!fs.statSync(dir).isDirectory()) continue;
+    // Shared npm/pip cache: not owned by any session, only dropped on --cache.
+    if (name === SHARED_CACHE && !DROP_CACHE) {
+      console.log(`KEEP   ${root}/${name} (cache bersama, pakai --cache untuk hapus)`);
+      continue;
+    }
     // .opencode-home-<sessionId> belongs to the session named in its suffix.
     const owner = name.startsWith('.opencode-home-')
       ? name.slice('.opencode-home-'.length)
