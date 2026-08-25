@@ -111,6 +111,29 @@ CPAgents bisa mem-publish project yang dibuatnya sendiri:
 4. URL live (`https://nama-web.vercel.app`) muncul di log setelah selesai.
 
 Token di-inject sebagai environment variable, jadi model tidak pernah melihat atau mencetak nilainya.
+Token Vercel/Netlify hanya dikirim ke proses agent pada task deploy; task biasa jalan tanpa kredensial itu.
+
+### GitHub Token — pakai **Fine-grained**
+
+Settings → **GitHub Token**. Buat di
+[github.com/settings/personal-access-tokens](https://github.com/settings/personal-access-tokens):
+
+- **Repository access:** Only select repositories → pilih repo yang dipakai (jangan "All repositories").
+- **Permissions → Repository permissions → Contents: Read and write.** Hanya ini yang wajib.
+  (Tambah **Workflows: Read and write** hanya jika agent perlu mengubah file di `.github/workflows/`.)
+- **Expiration:** pilih yang pendek, mis. 30–90 hari.
+
+Classic PAT juga jalan, tapi scope `repo` memberi akses tulis ke **semua** repo Anda — hindari kecuali
+agent harus membuat repo baru sendiri (fine-grained tidak bisa create repo).
+
+**Mode deploy** (Settings → Deploy Mode):
+- `cli` — agent menjalankan `vercel deploy` sendiri.
+- `git` — deploy = `git push`; platform build otomatis. Di mode ini token Vercel/Netlify **tidak**
+  diberikan ke agent sama sekali, supaya satu commit tidak ter-deploy dua kali.
+
+Token disimpan di tabel `Settings` pada `dev.db` dalam bentuk **plaintext**, dan saat runtime ditulis ke
+`workspaces/.opencode-home-<nama>/.git-credentials` (mode `600`, di luar folder project sehingga tidak
+ikut commit atau ZIP export). Jadi jaga akses server dan `dev.db`, dan revoke token bila bocor.
 
 ---
 
@@ -119,12 +142,17 @@ Token di-inject sebagai environment variable, jadi model tidak pernah melihat at
 ```bash
 pkill -9 -f "opencode run"
 cd ~/CPAgents
+cp dev.db "dev.db.bak-$(date +%Y%m%d-%H%M%S)"   # db push bisa ubah tabel
+git remote set-url origin https://github.com/yusuffadllh/CPAgents.git
 git pull
-npx prisma db push        # jika ada perubahan schema
+npm ci                    # dependency dokumen baru (pdfkit, exceljs, docx, pptxgenjs)
+npx prisma db push        # WAJIB rilis ini: kolom githubToken/deployMode dsb.
 npm run build
 pm2 restart ai-chat --update-env   # ganti "ai-chat" dengan nama PM2 app-mu
 pm2 logs ai-chat
 ```
+
+Backup `dev.db.bak-*` diabaikan git (lihat `.gitignore`), jadi aman ditinggal di server.
 
 ---
 
