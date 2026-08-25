@@ -4,6 +4,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { runOpencode } from '@/lib/opencode';
 import { buildBudgetedPrompt } from '@/lib/context';
+import { resolveWorkspaceName } from '@/lib/workspace';
+import { deployRules, isSafeRepoUrl } from '@/lib/deploy-rules';
 
 export const dynamic = 'force-dynamic';
 // Deploy can take a while (install + build + upload); allow up to ~30 min.
@@ -22,18 +24,32 @@ function slugifyProjectName(raw) {
 
 export async function POST(request) {
   try {
-    const { sessionId, projectName: rawProjectName } = await request.json();
+    const { sessionId, projectName: rawProjectName, repoUrl: rawRepoUrl } = await request.json();
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
     }
     const projectName = slugifyProjectName(rawProjectName);
+    if (rawRepoUrl && !isSafeRepoUrl(rawRepoUrl)) {
+      return NextResponse.json(
+        { error: 'repoUrl must be a plain https://github.com/<owner>/<repo> URL' },
+        { status: 400 },
+      );
+    }
+    const repoUrl = rawRepoUrl ? String(rawRepoUrl).trim() : null;
 
     const settings = await prisma.settings.findUnique({ where: { id: 1 } });
     if (!settings || !settings.apiKey) {
       return NextResponse.json({ error: 'API Key not configured' }, { status: 400 });
     }
 
-    if (!settings.vercelToken && !settings.netlifyToken) {
+    const gitMode = settings.deployMode === 'git';
+    if (gitMode && !settings.githubToken) {
+      return NextResponse.json(
+        { error: 'Deploy mode is "via GitHub" but no GitHub token is set. Add one in Settings.' },
+        { status: 400 },
+      );
+    }
+    if (!gitMode && !settings.vercelToken && !settings.netlifyToken) {
       return NextResponse.json(
         { error: 'No deploy credentials configured. Set a Vercel or Netlify token in Settings.' },
         { status: 400 },
@@ -45,60 +61,36 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // Build a deploy-only instruction listing only the platforms whose token
-    // is configured. The tokens themselves are injected as env vars by
-    // runOpencode, so the model never sees or prints them.
-    const deployTargets = [];
-    if (settings.vercelToken) {
-      // `vercel link` first so a re-deploy overwrites the same project instead of
-      // creating a new one (the old `--name` flag is deprecated and unreliable).
-      const vercelSteps = projectName
-        ? [
-            `- Vercel (env VERCEL_TOKEN is set), run these two commands from the project root:`,
-            `  1. \`npx --yes vercel link --yes --project "${projectName}" --token="$VERCEL_TOKEN"\` — links this directory to the project "${projectName}", creating it only if it does not exist yet. This is what makes a re-deploy overwrite the SAME project.`,
-            `  2. \`npx --yes vercel deploy --prod --yes --token="$VERCEL_TOKEN"\` — do NOT pass --name, it is deprecated.`,
-            `  The site will be reachable at https://${projectName}.vercel.app once live.`,
-          ]
-        : [
-            `- Vercel (env VERCEL_TOKEN is set): run \`npx --yes vercel deploy --prod --yes --token="$VERCEL_TOKEN"\` from the project root. Vercel auto-detects the framework.`,
-          ];
-      deployTargets.push(...vercelSteps);
-    }
-    if (settings.netlifyToken) {
-      deployTargets.push(
-        `- Netlify (env NETLIFY_AUTH_TOKEN is set): build first if needed, then run \`npx --yes netlify deploy --prod --dir=<build-output-dir> --auth "$NETLIFY_AUTH_TOKEN"\` (use the correct output dir: dist/build/out/ or . for static).${projectName ? ` If Netlify asks for a site name, use "${projectName}".` : ''}`,
-      );
-    }
+    const rules = deployRules(settings, { projectName, repoUrl, context: 'deploy' });
+    const isGitMode = settings.deployMode === 'git';
 
     const prompt = buildBudgetedPrompt(
       [
         {
-          text: `You are deploying an already-built project that lives in the current working directory. Your ONLY job is to publish it live and report the URL.`,
+          text: isGitMode
+            ? `The project in the current working directory is already built. Your ONLY job is to commit it and push it to GitHub — the hosting platform builds automatically from that push.`
+            : `You are deploying an already-built project that lives in the current working directory. Your ONLY job is to publish it live and report the URL.`,
           priority: 10,
           truncatable: false,
         },
         {
           text: [
-            `DEPLOY INSTRUCTIONS:`,
-            `- Prefer Vercel for Next.js/frontend apps, Netlify for static sites. Pick ONE platform below and deploy.`,
-            ...deployTargets,
-            `- The credentials are already provided via environment variables. Do NOT ask for tokens or logins, and NEVER print token values.`,
-            projectName
-              ? `- The desired project/site name is "${projectName}". On Vercel this is set by \`vercel link --project "${projectName}"\` (see above), NOT by --name and NOT by a "name" key in vercel.json. If a project with that name already exists it will be reused and this deploy overwrites its production — that is the intended behaviour.`
-              : `- Let the platform pick the project name automatically.`,
+            rules,
+            projectName && !isGitMode
+              ? `- The desired project/site name is "${projectName}". On Vercel this is set by \`vercel link --project "${projectName}"\`, NOT by --name and NOT by a "name" key in vercel.json. If a project with that name already exists it is reused and this deploy overwrites its production — that is intended.`
+              : null,
             `- Install dependencies and build only if the platform needs it. Keep every command small.`,
-            `- If a deploy command fails, read the error and try the correct fix once; do not loop forever.`,
+            `- If a command fails, read the error and try the correct fix once; do not loop forever.`,
             `VERCEL vercel.json RULES (read carefully, these cause silent 404s):`,
             `- If vercel.json uses a "services" object, every service is PRIVATE by default. You MUST add a TOP-LEVEL "rewrites" array that exposes it, e.g. {"rewrites":[{"source":"/(.*)","destination":{"service":"frontend"}}]}. A "rewrites" array placed INSIDE a service only runs after the request already entered that service, so without the top-level rewrite the whole site returns 404 even though the build succeeds.`,
             `- In "services" mode the keys buildCommand, installCommand, outputDirectory, framework, devCommand, ignoreCommand and functions are NOT allowed at the top level; move them inside the relevant service. "framework" must be a string (e.g. "vite", "nextjs"), never null.`,
             `- The "name" property in vercel.json is deprecated; do not add it.`,
             `- For a simple single-app project, prefer NO "services" key at all — just top-level buildCommand/outputDirectory/framework.`,
-            `VERIFY BEFORE REPORTING SUCCESS:`,
-            `- After the deploy reports Ready, run \`curl -s -o /dev/null -w "%{http_code}" <live-url>\` on the final URL.`,
-            `- If the status is 404 or 5xx, the deploy is NOT done: diagnose (usually routing/output directory), fix the config, redeploy, and re-check. Only report success once the URL returns 200 (or 3xx to a working page).`,
-            `- At the very end, print the final live URL on its own line prefixed with "LIVE URL: ".`,
+            isGitMode ? null : `VERIFY BEFORE REPORTING SUCCESS:`,
+            isGitMode ? null : `- After the deploy reports Ready, run \`curl -s -o /dev/null -w "%{http_code}" <live-url>\` on the final URL.`,
+            isGitMode ? null : `- If the status is 404 or 5xx, the deploy is NOT done: diagnose (usually routing/output directory), fix the config, redeploy, and re-check. Only report success once the URL returns 200 (or 3xx to a working page).`,
             `- Do NOT explore hidden/system folders. Work only in the current directory.`,
-          ].join('\n'),
+          ].filter(Boolean).join('\n'),
           priority: 9,
           truncatable: false,
         },
@@ -128,11 +120,12 @@ export async function POST(request) {
         };
 
         try {
-          const workspaceDir = path.join(process.cwd(), 'workspaces', sessionId);
+          const workspaceName = await resolveWorkspaceName(sessionId);
+          const workspaceDir = path.join(process.cwd(), 'workspaces', workspaceName);
           await fs.mkdir(workspaceDir, { recursive: true });
 
           sendEvent('log', { message: `🚀 Memulai deploy untuk project ini...` });
-          sendEvent('log', { message: `📁 Workspace: workspaces/${sessionId}` });
+          sendEvent('log', { message: `📁 Workspace: workspaces/${workspaceName}` });
 
           const capturedLines = [];
           let exitCode = 0;
@@ -143,6 +136,7 @@ export async function POST(request) {
               cwd: workspaceDir,
               settings,
               signal,
+              allowDeploy: true,
               onOutput: (line) => {
                 capturedLines.push(line);
                 if (capturedLines.length <= 2000) {

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { cleanGoalInput, buildBudgetedPrompt, fetchChatWithRetry, parseChatCompletion } from '@/lib/context';
+import { createSessionSlug } from '@/lib/workspace';
 
 export async function POST(request) {
   try {
@@ -46,6 +47,12 @@ export async function POST(request) {
 
       session = await prisma.session.create({
         data: { goal: goal }
+      });
+
+      // Name the workspace folder after the goal instead of the uuid.
+      session = await prisma.session.update({
+        where: { id: session.id },
+        data: { slug: await createSessionSlug(rawGoal, session.id) },
       });
     }
 
@@ -122,19 +129,40 @@ You MUST respond with ONLY a valid JSON array of objects. Format: [{"description
       ];
     }
 
-    // Auto-append a deploy task when the goal asks to go online AND at least
-    // one deploy credential is configured. This makes the agent publish the
-    // result by itself instead of only building it locally.
+    // A push task must come before deploy: in git mode the push IS the deploy
+    // trigger, and in cli mode the code should be on GitHub before publishing.
+    if (settings.githubToken) {
+      const alreadyHasPushTask = tasksData.some(
+        (t) => t && t.description && /\bpush\b|\bgithub\b|\brepo(sitory)?\b/i.test(t.description)
+      );
+      if (!alreadyHasPushTask) {
+        const repoInGoal = (rawGoal || '').match(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?/);
+        tasksData.push({
+          description: repoInGoal
+            ? `Commit all work and push it to the GitHub repository ${repoInGoal[0]}`
+            : `Commit all work and push it to GitHub (use the existing origin remote; if there is none, commit locally only)`,
+        });
+      }
+    }
+
+    // Auto-append a deploy task when the goal asks to go online AND deploying is
+    // actually possible. In git mode the GitHub token is what enables it,
+    // because the platform builds from the push.
     const wantsDeploy = /deploy|publish|online|go.?live|hosting|host it|ke internet|terbitkan|luncurkan/i.test(rawGoal || '');
-    const hasDeployCreds = !!(settings.vercelToken || settings.netlifyToken);
+    const gitMode = settings.deployMode === 'git';
+    const hasDeployCreds = gitMode
+      ? !!settings.githubToken
+      : !!(settings.vercelToken || settings.netlifyToken);
     if (wantsDeploy && hasDeployCreds) {
       const alreadyHasDeployTask = tasksData.some(
         (t) => t && t.description && /deploy|publish|luncurkan|terbitkan|online/i.test(t.description)
       );
       if (!alreadyHasDeployTask) {
-        const platform = settings.vercelToken ? 'Vercel' : 'Netlify';
+        const platform = gitMode ? 'GitHub push' : settings.vercelToken ? 'Vercel' : 'Netlify';
         tasksData.push({
-          description: `Deploy the finished project online using ${platform} and report the live production URL`,
+          description: gitMode
+            ? `Deploy the finished project by pushing to GitHub — the connected platform builds it automatically — then report the production URL`
+            : `Deploy the finished project online using ${platform} and report the live production URL`,
         });
       }
     }

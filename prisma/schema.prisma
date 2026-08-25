@@ -21,11 +21,25 @@ model Settings {
   // the project it builds. Empty means that platform is unavailable.
   vercelToken  String @default("")
   netlifyToken String @default("")
+
+  // GitHub push credentials. Without an identity `git commit` aborts with
+  // "Please tell me who you are", which is the usual cause of failed commits.
+  githubToken    String @default("")
+  githubUsername String @default("")
+  githubEmail    String @default("")
+
+  // "cli"  = deploy straight from the machine (default).
+  // "git"  = push to GitHub only and let the platform's Git integration build,
+  //          which avoids the duplicate deployment you get when both run.
+  deployMode String @default("cli")
 }
 
 model Session {
   id        String    @id @default(uuid())
   goal      String
+  // Human-readable folder name for workspaces/<slug>, derived from the goal.
+  // Null for sessions created before slugs existed; those still use the id.
+  slug      String?   @unique
   createdAt DateTime  @default(now())
   messages  Message[]
   tasks     Task[]

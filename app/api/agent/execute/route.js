@@ -4,11 +4,17 @@ import fs from 'fs/promises';
 import path from 'path';
 import { runOpencode } from '@/lib/opencode';
 import { buildBudgetedPrompt } from '@/lib/context';
+import { resolveWorkspaceName } from '@/lib/workspace';
+import { deployRules, gitPushRules } from '@/lib/deploy-rules';
 
 export const dynamic = 'force-dynamic';
 // Executor runs long-lived agent processes; allow up to ~60 min (must stay >=
 // OpenCode's own maxTimeoutMs so the run isn't cut off by the HTTP route).
 export const maxDuration = 3600;
+
+// Must stay in sync with the copies in app/page.js and the revise route.
+const DEPLOY_TASK_RE = /deploy|publish|luncurkan|terbitkan|online|go.?live|hosting/i;
+const PUSH_TASK_RE = /\bpush\b|\bgithub\b|\brepo(sitory)?\b/i;
 
 // Count files under `dir` that were created/modified at or after `sinceMs`.
 // Skips the isolated OpenCode home dir and node_modules/.git so we only measure
@@ -109,34 +115,19 @@ export async function POST(request) {
       `- When the task is fully done, end IMMEDIATELY with a short summary of the concrete files you created/changed. Do not keep exploring after the deliverable exists.`,
     ].join('\n');
 
-    // If this task is about deploying/publishing and deploy credentials are
-    // configured, tell the model exactly how to deploy on each platform whose
-    // token is present. Only mention configured platforms so the model doesn't
-    // waste turns on unavailable ones.
-    const wantsDeploy = /deploy|publish|online|go.?live|host|vercel|netlify/i.test(
-      `${currentTask.description} ${session.goal}`
-    );
-    const deployTargets = [];
-    if (settings.vercelToken) {
-      deployTargets.push(
-        `- Vercel: the env var VERCEL_TOKEN is already set. From the project directory run: \`npx --yes vercel deploy --prod --yes --token="$VERCEL_TOKEN"\`. Vercel auto-detects the framework. After it finishes, print the production URL it returns.`
-      );
-    }
-    if (settings.netlifyToken) {
-      deployTargets.push(
-        `- Netlify: the env var NETLIFY_AUTH_TOKEN is already set. Build first if needed, then run: \`npx --yes netlify deploy --prod --dir=<build-output-dir> --auth "$NETLIFY_AUTH_TOKEN"\` (use the correct build output dir, e.g. dist, build, out, or . for static). Print the deploy URL it returns.`
-      );
-    }
-    const deployRules =
-      wantsDeploy && deployTargets.length
-        ? [
-            `DEPLOYMENT INSTRUCTIONS (this task involves publishing the project online):`,
-            `- Deploy the finished project using one of the platforms below. Prefer Vercel for Next.js/frontend apps, Netlify for static sites.`,
-            ...deployTargets,
-            `- Do NOT ask for tokens or logins — they are already provided via environment variables. Never print the token values.`,
-            `- At the very end, clearly print the final live URL on its own line prefixed with "LIVE URL: ".`,
-          ].join('\n')
-        : null;
+    // Match on THIS task only. Matching the goal too meant that a goal like
+    // "build a site and deploy it" put deploy instructions in every task, so
+    // the agent could publish a half-finished project on step 1.
+    const wantsDeploy = DEPLOY_TASK_RE.test(currentTask.description || '');
+    const repoUrl = (`${currentTask.description}\n${session.goal}`.match(
+      /https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?/,
+    ) || [])[0];
+
+    // Commit after every task so progress is recoverable; push and deploy only
+    // when the task itself is about that.
+    const taskRules = wantsDeploy
+      ? deployRules(settings, { repoUrl, context: 'task' })
+      : gitPushRules(settings, repoUrl, { allowPush: PUSH_TASK_RE.test(currentTask.description || '') });
 
     // Assemble the prompt within a token budget. Rules + current task are
     // essential (never truncated); the overall goal and prior-task context are
@@ -146,7 +137,7 @@ export async function POST(request) {
       [
         { text: `IMPORTANT RULES ARE BELOW — follow them strictly.`, priority: 10, truncatable: false },
         { text: `Your current task: ${currentTask.description}`, priority: 9, truncatable: false },
-        deployRules ? { text: deployRules, priority: 9, truncatable: false } : null,
+        taskRules ? { text: taskRules, priority: 9, truncatable: false } : null,
         { text: rules, priority: 8, truncatable: false },
         { text: `Overall goal: ${session.goal}`, priority: 5, truncatable: true },
         priorContext ? { text: `Context from earlier tasks:\n${priorContext}`, priority: 1, truncatable: true } : null,
@@ -178,11 +169,12 @@ export async function POST(request) {
           await prisma.task.updateMany({ where: { id: taskId }, data: { status: 'RUNNING' } });
 
           // Isolated workspace directory for this session.
-          const workspaceDir = path.join(process.cwd(), 'workspaces', sessionId);
+          const workspaceName = await resolveWorkspaceName(sessionId);
+          const workspaceDir = path.join(process.cwd(), 'workspaces', workspaceName);
           await fs.mkdir(workspaceDir, { recursive: true });
 
           sendEvent('log', { message: `🚀 Menjalankan OpenCode untuk task: ${currentTask.description}` });
-          sendEvent('log', { message: `📁 Workspace: workspaces/${sessionId}` });
+          sendEvent('log', { message: `📁 Workspace: workspaces/${workspaceName}` });
 
           const capturedLines = [];
           let exitCode = 0;
@@ -194,6 +186,7 @@ export async function POST(request) {
               cwd: workspaceDir,
               settings,
               signal,
+              allowDeploy: wantsDeploy,
               onOutput: (line) => {
                 capturedLines.push(line);
                 // Cap forwarded log volume to keep the UI responsive.
@@ -214,9 +207,24 @@ export async function POST(request) {
           }
 
           if (signal && signal.aborted) {
-            sendEvent('log', { message: '⛔ Eksekusi dibatalkan oleh user.' });
-            await prisma.task.updateMany({ where: { id: taskId }, data: { status: 'PENDING' } });
-            sendEvent('done', { tasks: session.tasks });
+            // Record what the run managed to do before the stop: the workspace
+            // keeps those edits, so a blind re-run would redo them from scratch.
+            const partial = capturedLines.join('\n').slice(-8000);
+            let touched = 0;
+            try { touched = await countChangedFiles(workspaceDir, runStartedAt); } catch {}
+            await prisma.task.updateMany({
+              where: { id: taskId },
+              data: {
+                status: 'PENDING',
+                result: `⛔ Dihentikan oleh user (${touched} file sempat dibuat/diubah).\n\n**Output sebelum berhenti:**\n\`\`\`text\n${partial || '(belum ada output)'}\n\`\`\``,
+              },
+            });
+            sendEvent('log', { message: `⛔ Eksekusi dihentikan. ${touched} file sempat berubah dan tetap tersimpan di workspace.` });
+            const stoppedTasks = await prisma.task.findMany({
+              where: { sessionId },
+              orderBy: { createdAt: 'asc' },
+            });
+            sendEvent('done', { tasks: stoppedTasks });
             finish();
             return;
           }

@@ -90,6 +90,12 @@ export default function Sidebar({ setShowSettings, currentMode, sessions = [], o
                     )}
                   </div>
 
+                  {session.slug && (
+                    <div style={{ fontSize: '0.7rem', opacity: 0.5, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`workspaces/${session.slug}`}>
+                      📁 {session.slug}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.45rem', borderRadius: '999px', background: badge.bg, color: badge.color, whiteSpace: 'nowrap' }}>
                       {badge.text}

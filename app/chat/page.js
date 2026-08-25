@@ -7,6 +7,16 @@ import FileBrowser from '../components/FileBrowser';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+const ATT_ICONS = {
+  pdf: '📕', xlsx: '📊', xls: '📊', csv: '📊', docx: '📘', doc: '📘',
+  pptx: '📙', ppt: '📙', zip: '🗜️', png: '🖼️', jpg: '🖼️', jpeg: '🖼️',
+};
+
+function attIcon(att) {
+  const ext = (att.name || '').split('.').pop().toLowerCase();
+  return ATT_ICONS[ext] || (att.created ? '📄' : '📎');
+}
+
 export default function ChatPage() {
   const [settings, setSettings] = useState({ baseUrl: '', apiKey: '', modelName: '' });
   const [showSettings, setShowSettings] = useState(false);
@@ -343,7 +353,7 @@ export default function ChatPage() {
                         }}
                         title="Klik untuk download"
                       >
-                        {att.created ? '📄' : '📎'} {att.name} <span style={{ opacity: 0.6 }}>⬇</span>
+                        {attIcon(att)} {att.name} <span style={{ opacity: 0.6 }}>⬇</span>
                       </a>
                     ) : (
                       <span key={i} style={{

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { resolveWorkspaceName } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,12 @@ export async function GET(request) {
     return NextResponse.json({ error: 'sessionId and path required' }, { status: 400 });
   }
 
-  const base = path.join(process.cwd(), 'workspaces', sessionId);
+  const workspaceName = await resolveWorkspaceName(sessionId);
+  if (!workspaceName) {
+    return NextResponse.json({ error: 'Invalid sessionId' }, { status: 400 });
+  }
+
+  const base = path.join(process.cwd(), 'workspaces', workspaceName);
   const target = path.resolve(base, relPath);
   if (target !== base && !target.startsWith(base + path.sep)) {
     return NextResponse.json({ error: 'Invalid path' }, { status: 400 });

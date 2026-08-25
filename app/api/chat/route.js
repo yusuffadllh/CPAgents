@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { fetchChatWithRetry, parseChatCompletion } from '@/lib/context';
+import { parseDocBlocks, writeDocuments } from '@/lib/documents';
+import { resolveWorkspaceName, isSafeDirName } from '@/lib/workspace';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -20,6 +22,26 @@ Aturan:
 - Boleh membuat beberapa file dalam satu balasan (ulang blok di atas).
 - Tetap beri penjelasan singkat di luar blok bila perlu.
 - Jangan gunakan format ini kalau pengguna tidak minta dibuatkan file.
+
+DOKUMEN (PDF, Excel, Word, PowerPoint, CSV):
+Untuk format dokumen JANGAN pakai blok <<<FILE>>>. Pakai blok <<<DOC>>> berisi JSON, dan sistem akan merendernya jadi file asli:
+
+<<<DOC: pdf: laporan.pdf>>>
+{"title":"Laporan Penjualan","blocks":[{"type":"heading","level":2,"text":"Ringkasan"},{"type":"paragraph","text":"Penjualan naik 12%."},{"type":"list","items":["Poin A","Poin B"]},{"type":"table","headers":["Produk","Jumlah"],"rows":[["Kopi",120],["Teh",80]]}]}
+<<<END>>>
+
+Skema per tipe:
+- pdf / docx -> {"title":"...","blocks":[...]} dengan blok: heading (level 1-3), paragraph, list (items), table (headers, rows), pagebreak.
+- xlsx -> {"sheets":[{"name":"Sheet1","headers":["A","B"],"rows":[[1,2]]}]}. Tulis angka sebagai number (tanpa kutip) agar bisa dijumlah di Excel.
+- pptx -> {"slides":[{"title":"Judul","bullets":["poin 1"],"notes":"catatan","table":{"headers":[],"rows":[]}}]}
+- csv -> {"headers":["A","B"],"rows":[[1,2]]}
+
+Aturan dokumen:
+- JSON harus VALID dan berada dalam satu blok (tanpa komentar, tanpa trailing comma).
+- Isi dengan data nyata sesuai permintaan pengguna, jangan template kosong atau lorem ipsum.
+- Nama file harus memakai ekstensi yang sesuai dengan tipe blok.
+- Gambar tidak didukung di dokumen; sajikan sebagai tabel atau teks.
+- Batas: maksimal 10 dokumen per jawaban, 20.000 baris per tabel, 64 kolom, dan 100 MB per file. Data di atas batas akan dipotong, jadi ringkas bila perlu.
 Jawab dalam bahasa yang sama dengan pengguna.`;
 
 // Extract <<<FILE: name>>> ... <<<END>>> blocks from an assistant reply.
@@ -181,6 +203,22 @@ export async function POST(request) {
       );
     }
 
+    // Document blocks carry a JSON spec that the server turns into a real
+    // PDF/xlsx/docx/pptx, so chat can produce binaries without running code.
+    const docBlocks = parseDocBlocks(assistantContent);
+    if (docBlocks.length > 0) {
+      const rendered = await writeDocuments(session.id, docBlocks);
+      fileAttachments = [...fileAttachments, ...rendered.filter((a) => a.type === 'file')];
+      const failed = rendered.filter((a) => a.type === 'error');
+      assistantContent = assistantContent.replace(
+        /<<<DOC:\s*(?:pdf|xlsx|docx|pptx|csv)\s*:\s*(.+?)\s*>>>\r?\n[\s\S]*?\r?\n?<<<END>>>/gi,
+        (_match, name) => `📄 Dokumen dibuat: **${name.trim()}**`
+      );
+      if (failed.length) {
+        assistantContent += `\n\n⚠️ Gagal membuat: ${failed.map((f) => `${f.name} (${f.error})`).join(', ')}`;
+      }
+    }
+
     // Save assistant message
     const assistantMessage = await prisma.message.create({
       data: {
@@ -244,17 +282,24 @@ export async function GET(request) {
   }
 }
 
-// Remove the on-disk workspaces for a session. Rejects ids that are not plain
-// UUID-ish tokens so a crafted sessionId can never escape the project dir.
-async function removeWorkspaces(sessionId) {
-  if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return [];
-  const targets = [
-    path.join('workspaces', sessionId),
-    path.join('chat-workspaces', sessionId),
-    // OpenCode's isolated HOME lives NEXT TO the workspace (see lib/opencode.js)
-    // and is usually far larger than the workspace itself.
-    path.join('workspaces', `.opencode-home-${sessionId}`),
-  ];
+// Remove the on-disk workspaces for a session. Rejects names that are not plain
+// slug/uuid tokens so a crafted sessionId can never escape the project dir.
+async function removeWorkspaces(sessionId, workspaceName) {
+  if (!isSafeDirName(sessionId)) return [];
+  const names = new Set([sessionId]);
+  // Sessions created before slugs kept the uuid, so clear both spellings.
+  if (isSafeDirName(workspaceName)) names.add(workspaceName);
+
+  const targets = [];
+  for (const name of names) {
+    targets.push(
+      path.join('workspaces', name),
+      path.join('chat-workspaces', name),
+      // OpenCode's isolated HOME lives NEXT TO the workspace (see lib/opencode.js)
+      // and is usually far larger than the workspace itself.
+      path.join('workspaces', `.opencode-home-${name}`),
+    );
+  }
   const removed = [];
   for (const rel of targets) {
     const dir = path.join(process.cwd(), rel);
@@ -278,11 +323,14 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
     }
 
+    // Read the slug before the row disappears, or the folder becomes orphaned.
+    const workspaceName = deleteFiles ? await resolveWorkspaceName(sessionId) : null;
+
     await prisma.message.deleteMany({ where: { sessionId } });
     await prisma.task.deleteMany({ where: { sessionId } });
     await prisma.session.delete({ where: { id: sessionId } });
 
-    const removed = deleteFiles ? await removeWorkspaces(sessionId) : [];
+    const removed = deleteFiles ? await removeWorkspaces(sessionId, workspaceName) : [];
 
     return NextResponse.json({ success: true, removed });
   } catch (error) {

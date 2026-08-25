@@ -13,12 +13,18 @@ const DROP_CACHE = process.argv.includes('--cache');
 const ROOTS = ['workspaces', 'chat-workspaces'];
 const SHARED_CACHE = '.agent-cache';
 
+// A live session owns two possible folder names: its slug and its raw id.
 function liveSessionIds() {
   const file = (process.env.DATABASE_URL || 'file:./dev.db').replace(/^file:/, '');
   const db = new Database(path.resolve(process.cwd(), file), { readonly: true });
-  const ids = new Set(db.prepare('SELECT id FROM Session').all().map((r) => r.id));
+  const rows = db.prepare('SELECT id, slug FROM Session').all();
   db.close();
-  return ids;
+  const names = new Set();
+  for (const r of rows) {
+    names.add(r.id);
+    if (r.slug) names.add(r.slug);
+  }
+  return names;
 }
 
 function dirSize(dir) {

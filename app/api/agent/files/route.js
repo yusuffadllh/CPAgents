@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { resolveWorkspaceName } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +11,8 @@ const MAX_FILE_BYTES = 500 * 1024;
 // Folders we never want to show — internal/system noise.
 const HIDDEN_DIRS = new Set(['.git', '.next', 'node_modules', '.opencode', '.cache']);
 
-function safeResolve(sessionId, relPath) {
-  const base = path.join(process.cwd(), 'workspaces', sessionId);
+function safeResolve(workspaceName, relPath) {
+  const base = path.join(process.cwd(), 'workspaces', workspaceName);
   // Normalize and block path traversal outside the workspace.
   const target = path.resolve(base, relPath || '.');
   if (target !== base && !target.startsWith(base + path.sep)) {
@@ -31,7 +32,12 @@ export async function GET(request) {
       return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
     }
 
-    const resolved = safeResolve(sessionId, relPath);
+    const workspaceName = await resolveWorkspaceName(sessionId);
+    if (!workspaceName) {
+      return NextResponse.json({ error: 'Invalid sessionId' }, { status: 400 });
+    }
+
+    const resolved = safeResolve(workspaceName, relPath);
     if (!resolved) {
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }

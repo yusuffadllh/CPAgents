@@ -28,7 +28,10 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const { baseUrl, apiKey, modelName, imageModelName, vercelToken, netlifyToken } = await request.json();
+    const {
+      baseUrl, apiKey, modelName, imageModelName, vercelToken, netlifyToken,
+      githubToken, githubUsername, githubEmail, deployMode,
+    } = await request.json();
 
     const data = { baseUrl, apiKey, modelName };
     if (imageModelName !== undefined) data.imageModelName = imageModelName;
@@ -36,11 +39,23 @@ export async function POST(request) {
     // doesn't wipe previously stored credentials.
     if (vercelToken !== undefined) data.vercelToken = vercelToken;
     if (netlifyToken !== undefined) data.netlifyToken = netlifyToken;
+    if (githubToken !== undefined) data.githubToken = githubToken;
+    if (githubUsername !== undefined) data.githubUsername = githubUsername;
+    if (githubEmail !== undefined) data.githubEmail = githubEmail;
+    if (deployMode !== undefined) data.deployMode = deployMode === 'git' ? 'git' : 'cli';
 
     const settings = await prisma.settings.upsert({
       where: { id: 1 },
       update: data,
-      create: { id: 1, baseUrl, apiKey, modelName, vercelToken: vercelToken || '', netlifyToken: netlifyToken || '' },
+      create: {
+        id: 1, baseUrl, apiKey, modelName,
+        vercelToken: vercelToken || '',
+        netlifyToken: netlifyToken || '',
+        githubToken: githubToken || '',
+        githubUsername: githubUsername || '',
+        githubEmail: githubEmail || '',
+        deployMode: deployMode === 'git' ? 'git' : 'cli',
+      },
     });
 
     return NextResponse.json(settings);

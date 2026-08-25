@@ -15,7 +15,7 @@ import { cleanGoalInput } from '../lib/context';
 const DEPLOY_TASK_RE = /deploy|publish|luncurkan|terbitkan|online|go.?live|hosting/i;
 
 export default function Home() {
-  const [settings, setSettings] = useState({ baseUrl: '', apiKey: '', modelName: '', vercelToken: '', netlifyToken: '' });
+  const [settings, setSettings] = useState({ baseUrl: '', apiKey: '', modelName: '', vercelToken: '', netlifyToken: '', githubToken: '', githubUsername: '', githubEmail: '', deployMode: 'cli' });
   const [showSettings, setShowSettings] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
   const [goal, setGoal] = useState('');
@@ -46,6 +46,7 @@ export default function Home() {
   const [isStopped, setIsStopped] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [projectName, setProjectName] = useState('');
+  const [repoUrl, setRepoUrl] = useState('');
 
   const [showRevise, setShowRevise] = useState(false);
   const [reviseText, setReviseText] = useState('');
@@ -417,7 +418,10 @@ export default function Home() {
       setTasks(data.tasks || []);
       setReviseText('');
       setShowRevise(false);
-      setLiveLogs(`📝 Revisi diterima: ${data.removed} task lama dibuang, ${data.added} task revisi dibuat.\n`);
+      setLiveLogs(
+        `📝 Revisi diterima: ${data.added} task revisi dibuat, ` +
+        `${data.removed} task lama dibuang, ${data.kept ?? 0} task lama tetap dipertahankan.\n`
+      );
 
       autoRetriesRef.current = 0;
       forceLoopRef.current = true;
@@ -449,7 +453,13 @@ export default function Home() {
       }
     } catch { /* fall back to current state */ }
 
-    if (!liveSettings.vercelToken && !liveSettings.netlifyToken) {
+    if (liveSettings.deployMode === 'git') {
+      if (!liveSettings.githubToken) {
+        alert('Mode deploy "Lewat GitHub" dipilih tapi GitHub token belum diisi. Lengkapi di Settings.');
+        setShowSettings(true);
+        return;
+      }
+    } else if (!liveSettings.vercelToken && !liveSettings.netlifyToken) {
       alert('Belum ada kredensial deploy. Isi Vercel/Netlify token dulu di Settings.');
       setShowSettings(true);
       return;
@@ -466,7 +476,7 @@ export default function Home() {
       const res = await fetch('/api/agent/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: currentSessionId, projectName }),
+        body: JSON.stringify({ sessionId: currentSessionId, projectName, repoUrl: repoUrl.trim() || undefined }),
         signal: abortControllersRef.current[currentSessionId].signal,
       });
 
@@ -739,6 +749,15 @@ export default function Home() {
                     ◈ Netlify —
                   </span>
                 )}
+                {settings.githubToken ? (
+                  <span title={settings.deployMode === 'git' ? 'GitHub siap — deploy lewat push (anti dobel)' : 'GitHub siap — agent bisa commit & push'} style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', borderRadius: '999px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.35)', color: '#fff' }}>
+                    🐙 GitHub ✓{settings.deployMode === 'git' ? ' · push-deploy' : ''}
+                  </span>
+                ) : (
+                  <span title="Token GitHub belum diatur — commit/push bisa gagal" style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', borderRadius: '999px', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)' }}>
+                    🐙 GitHub —
+                  </span>
+                )}
               </div>
 
               {!hasSubmitted ? (
@@ -836,7 +855,7 @@ export default function Home() {
                     )}
                     <button
                       onClick={() => setShowRevise(v => !v)}
-                      title="Sudah lihat hasilnya? Tulis apa yang perlu diperbaiki — task lama yang belum jalan akan dibuang."
+                      title="Tulis apa yang perlu diperbaiki. Task lama yang jadi tidak relevan dibuang, sisanya tetap jalan."
                       style={{ background: showRevise ? '#c2185b' : '#e91e63', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' }}
                     >
                       📝 Revisi
@@ -856,13 +875,23 @@ export default function Home() {
                       title="Nama project di Vercel → jadi nama-web.vercel.app. Kosongkan untuk otomatis."
                       style={{ background: 'var(--input-bg)', color: 'inherit', border: '1px solid var(--surface-border)', padding: '0.5rem 0.6rem', borderRadius: '6px', fontSize: '0.85rem', width: '160px' }}
                     />
+                    {settings.githubToken && (
+                      <input
+                        type="text"
+                        value={repoUrl}
+                        onChange={(e) => setRepoUrl(e.target.value)}
+                        placeholder="https://github.com/user/repo"
+                        title="Repo tujuan push. Kosongkan bila hanya commit lokal."
+                        style={{ background: 'var(--input-bg)', color: 'inherit', border: '1px solid var(--surface-border)', padding: '0.5rem 0.6rem', borderRadius: '6px', fontSize: '0.85rem', width: '220px' }}
+                      />
+                    )}
                     <button
                       onClick={handleDeploy}
                       disabled={isDeploying}
-                      title="Publish project ini online (Vercel/Netlify)"
+                      title={settings.deployMode === 'git' ? 'Commit & push ke GitHub — platform yang build' : 'Publish project ini online (Vercel/Netlify)'}
                       style={{ background: isDeploying ? '#9e9e9e' : '#673ab7', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: isDeploying ? 'not-allowed' : 'pointer' }}
                     >
-                      {isDeploying ? '🚀 Deploying...' : '🚀 Deploy'}
+                      {isDeploying ? '🚀 Deploying...' : settings.deployMode === 'git' ? '🐙 Push & Deploy' : '🚀 Deploy'}
                     </button>
                     <button onClick={exportAsZip} style={{ background: 'var(--surface-border)', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' }}>
                       💾 Export MD
@@ -876,7 +905,8 @@ export default function Home() {
                     <div className="animate-fade-in" style={{ marginTop: '0.75rem', padding: '1rem', background: 'var(--input-bg)', border: '1px solid var(--surface-border)', borderRadius: '10px' }}>
                       <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '0.5rem' }}>
                         Tulis apa yang kurang dari hasil yang sudah kamu lihat. Sertakan data asli (link GitHub/LinkedIn, nama, bio) supaya agent tidak mengarang.
-                        Task yang belum jalan akan dibuang, lalu revisi ini dikerjakan lebih dulu.
+                        Revisi dikerjakan lebih dulu; task lama yang jadi tidak relevan dibuang, sisanya tetap dilanjutkan.
+                        Bisa dipakai kapan saja — klik ⏹ Stop dulu kalau agent sedang jalan.
                       </div>
                       <textarea
                         value={reviseText}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import fs from 'fs';
 import path from 'path';
+import { resolveWorkspaceName } from '@/lib/workspace';
 
 // Fungsi rekursif untuk menambahkan file ke JSZip
 function addFilesToZip(zip, dirPath, basePath) {
@@ -27,7 +28,12 @@ export async function GET(request) {
     return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
   }
 
-  const workspaceDir = path.join(process.cwd(), 'workspaces', sessionId);
+  const workspaceName = await resolveWorkspaceName(sessionId);
+  if (!workspaceName) {
+    return NextResponse.json({ error: 'Invalid sessionId' }, { status: 400 });
+  }
+
+  const workspaceDir = path.join(process.cwd(), 'workspaces', workspaceName);
 
   if (!fs.existsSync(workspaceDir)) {
     return NextResponse.json({ error: 'Workspace not found for this session. The agent has not created any files yet.' }, { status: 404 });
@@ -43,7 +49,7 @@ export async function GET(request) {
     return new NextResponse(zipBuffer, {
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="workspace-${sessionId}.zip"`,
+        'Content-Disposition': `attachment; filename="${workspaceName}.zip"`,
       },
     });
   } catch (error) {
