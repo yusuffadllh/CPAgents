@@ -64,6 +64,8 @@ COVERAGE: every concrete deliverable the user named (each page, section, feature
 
 FIDELITY: carry the user's literal details into the task descriptions — exact URLs, names, section titles, colours, wording. If the user supplied personal data such as GitHub/LinkedIn links or a bio, restate it in the task that needs it so the executor uses the real value instead of inventing one. Never add a task that requires data the user did not provide.
 
+DOCUMENT DELIVERABLES: if the goal asks for a PDF, Excel/spreadsheet, Word, PowerPoint, CSV or chart, the tasks must produce the REAL file in that format — say so explicitly (e.g. "Generate laporan-penjualan.xlsx using exceljs, with sheets X and Y"). Never substitute a Markdown or plain-text file for a requested document format. Split content preparation and file generation into separate tasks only when the content is substantial.
+
 You MUST respond with ONLY a valid JSON array of objects. Format: [{"description": "task 1"}, {"description": "task 2"}]`;
 
     // Call gateway for Planner, retrying on transient 429/5xx ("busy").

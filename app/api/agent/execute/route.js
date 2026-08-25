@@ -97,6 +97,15 @@ export async function POST(request) {
       `- Do not ship a bare unstyled page. Apply a coherent visual design: a real colour palette, consistent spacing scale, readable typographic hierarchy, hover/focus states, and rounded/shadowed surfaces where appropriate. Aim for something a developer would be happy to show an employer.`,
       `- Implement EVERY section the goal asks for. Before finishing, re-read the goal and check each requested section actually exists and is wired up. A missing section counts as an incomplete task.`,
       `- Semantic HTML and basic a11y: real heading levels, alt text, labels on inputs, keyboard-focusable interactive elements.`,
+      `IF THIS TASK ASKS FOR A DOCUMENT (PDF, Excel, Word, PowerPoint, CSV, chart):`,
+      `- Produce the REAL binary file, not a description of it and not a Markdown stand-in. Node.js and npm are available; install what you need with \`npm install <pkg>\` inside the working directory, then run a small script with \`node\` to generate the file.`,
+      `- Recommended libraries: PDF -> \`pdfkit\` (pure JS, always works — prefer this); Excel .xlsx -> \`exceljs\` (styling, formulas, multiple sheets) or \`xlsx\`; Word .docx -> \`docx\`; PowerPoint .pptx -> \`pptxgenjs\`; CSV -> write it directly; charts to embed -> \`chartjs-node-canvas\`.`,
+      `- \`puppeteer\` gives the prettiest PDFs (renders styled HTML) but needs system Chrome libraries that may be missing on this server. You may try it, but if the browser fails to launch do NOT keep retrying or try to apt-get anything — switch to \`pdfkit\` immediately and finish the task.`,
+      `- If Python is available and you prefer it, \`openpyxl\`, \`python-docx\`, \`reportlab\` and \`python-pptx\` are equally acceptable. Pick ONE toolchain and stick to it.`,
+      `- Write the generator script to a file (e.g. \`generate-report.js\`), run it, then VERIFY the output exists and is non-empty with \`ls -l\`. A script that was written but never executed means the task FAILED.`,
+      `- Save the document in the current directory (or a clear subfolder like \`output/\`) with a descriptive filename and the correct extension.`,
+      `- Fill it with the real content the goal asks for. Never ship an empty template or lorem-ipsum rows.`,
+      `- At the end, print the exact filename(s) you produced so the user knows what to download.`,
       `- When the task is fully done, end IMMEDIATELY with a short summary of the concrete files you created/changed. Do not keep exploring after the deliverable exists.`,
     ].join('\n');
 

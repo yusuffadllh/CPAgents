@@ -465,6 +465,7 @@ export default function ChatPage() {
         <FileBrowser
           sessionId={sessionId}
           apiBase="/api/chat/files"
+          downloadBase="/api/chat/download"
           onClose={() => setShowFiles(false)}
         />
       )}

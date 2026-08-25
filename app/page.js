@@ -532,13 +532,6 @@ export default function Home() {
   const allTasksDone = tasks.length > 0 && pendingCount === 0 && failedCount === 0;
 
   const handleDeleteSession = async (id) => {
-    // Files live outside the DB, so deleting them is a separate opt-in choice.
-    const deleteFiles = confirm(
-      'Hapus juga semua file workspace sesi ini dari server?\n\n' +
-      'OK = hapus sesi + file (permanen, tidak bisa dikembalikan)\n' +
-      'Cancel = hapus sesi saja, file tetap tersimpan di server'
-    );
-
     if (abortControllersRef.current[id]) {
       abortControllersRef.current[id].abort();
       delete abortControllersRef.current[id];
@@ -554,7 +547,7 @@ export default function Home() {
     }
     
     try {
-      await fetch(`/api/chat?sessionId=${id}&deleteFiles=${deleteFiles}`, { method: 'DELETE' });
+      await fetch(`/api/chat?sessionId=${id}`, { method: 'DELETE' });
       fetchSessions();
     } catch (e) {
       console.error("Gagal menghapus sesi", e);
@@ -771,11 +764,43 @@ export default function Home() {
                       {isLoading ? '⏳' : '↑'}
                     </button>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <label htmlFor="maxLoops" style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>
+                      🔄 Max loop review
+                    </label>
+                    <input
+                      id="maxLoops"
+                      type="number"
+                      min="0"
+                      value={maxLoops}
+                      onChange={(e) => setMaxLoops(e.target.value)}
+                      style={{ width: '70px', padding: '0.35rem 0.5rem', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--surface-border)', color: 'white', outline: 'none' }}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>
+                      {String(maxLoops).trim() === '' ? 'kosong = tanpa batas' : parseInt(maxLoops, 10) === 0 ? '0 = tanpa review tambahan' : `agent menambah task maks. ${parseInt(maxLoops, 10)}x`}
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ padding: '1rem', background: 'var(--input-bg)', borderRadius: '12px', border: '1px solid var(--surface-border)' }}>
                     <strong>Goal:</strong> {goal}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>
+                    <label htmlFor="maxLoopsRunning">🔄 Max loop review</label>
+                    <input
+                      id="maxLoopsRunning"
+                      type="number"
+                      min="0"
+                      value={maxLoops}
+                      onChange={(e) => setMaxLoops(e.target.value)}
+                      title="Berapa kali agent boleh mengevaluasi hasil lalu menambah task baru. Kosongkan untuk tanpa batas."
+                      style={{ width: '70px', padding: '0.3rem 0.5rem', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--surface-border)', color: 'white', outline: 'none' }}
+                    />
+                    <span style={{ color: 'rgba(255,255,255,0.45)' }}>
+                      terpakai {loopCount === Infinity ? '∞' : loopCount}
+                      {String(maxLoops).trim() === '' ? ' / ∞' : ` / ${parseInt(maxLoops, 10)}`}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <button onClick={() => {
