@@ -123,8 +123,15 @@ Settings → **GitHub Token**. Buat di
   (Tambah **Workflows: Read and write** hanya jika agent perlu mengubah file di `.github/workflows/`.)
 - **Expiration:** pilih yang pendek, mis. 30–90 hari.
 
-Classic PAT juga jalan, tapi scope `repo` memberi akses tulis ke **semua** repo Anda — hindari kecuali
-agent harus membuat repo baru sendiri (fine-grained tidak bisa create repo).
+`Contents: write` cukup karena agent **tidak pernah membuat repo** — `git push` selalu ke remote yang
+sudah ada, dan prompt melarang model mengarang URL repo (lihat `lib/deploy-rules.js`). Jadi bikin dulu
+repo-nya di GitHub, lalu isi field **GitHub Repo URL** di UI.
+
+Kalau Anda memang ingin repo dibuat via API (`POST /user/repos`), permission-nya bukan Contents
+melainkan **Administration: Read and write** — dan karena repo-nya belum ada, token harus di-scope ke
+**All repositories**. Itu jauh lebih luas, jadi lebih baik buat repo manual sekali saja.
+
+Classic PAT juga jalan, tapi scope `repo` memberi akses tulis ke **semua** repo Anda — hindari.
 
 **Mode deploy** (Settings → Deploy Mode):
 - `cli` — agent menjalankan `vercel deploy` sendiri.
