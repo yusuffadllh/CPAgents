@@ -381,10 +381,6 @@ export type TaskUncheckedUpdateManyWithoutSessionNestedInput = {
   deleteMany?: Prisma.TaskScalarWhereInput | Prisma.TaskScalarWhereInput[]
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
-}
-
 export type TaskCreateWithoutSessionInput = {
   id?: string
   description: string

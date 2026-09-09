@@ -130,6 +130,24 @@ export default function SettingsModal({ settings, setSettings, onSave, onCancel 
         </div>
 
         <div style={{ borderTop: '1px solid var(--surface-border)', margin: '0.5rem 0 1rem', paddingTop: '1rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', opacity: 0.85 }}>📄 Google Service Account (opsional)</div>
+
+          <div style={{ marginBottom: '0.25rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>JSON Key (isi seluruh file)</label>
+            <textarea
+              rows={5}
+              placeholder='{"type": "service_account", "project_id": "...", ...}'
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--surface-border)', color: 'white', fontFamily: 'monospace', fontSize: '0.78rem', resize: 'vertical' }}
+              value={settings.googleServiceAccountJson || ''}
+              onChange={e => setSettings({ ...settings, googleServiceAccountJson: e.target.value })}
+            />
+            <small style={{ display: 'block', marginTop: '0.5rem', opacity: 0.6 }}>
+              Tempel isi file key JSON service account (yang diunduh dari Google Cloud Console). Agar agent bisa buat/edit Google Docs, Sheets, Slides, dan file Drive. Jangan lupa share folder/file Drive-nya ke email <code>client_email</code> sebagai Editor.
+            </small>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--surface-border)', margin: '0.5rem 0 1rem', paddingTop: '1rem' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', opacity: 0.85 }}>🐙 GitHub (opsional)</div>
 
           <div style={{ marginBottom: '1rem' }}>

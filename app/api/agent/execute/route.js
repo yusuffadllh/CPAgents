@@ -43,6 +43,29 @@ async function countChangedFiles(dir, sinceMs) {
   return changed;
 }
 
+// Google Workspace rules — only emitted when a service account key is stored
+// in Settings. The key is written to `.google-sa.json` inside the workspace by
+// the run step below (and excluded from FileBrowser/git via dot-prefix +
+// gitignore), so the agent can authenticate with GOOGLE_APPLICATION_CREDENTIALS.
+// Covers Docs, Sheets, Slides, Drive upload/download, and Calendar.
+const GOOGLE_DOC_RE = /docs\.google\.com|google\s?(docs|sheets?|slides?|drive)|gdocs|gsheet|spreadsheet|presentation/i;
+function buildGoogleRules(saJson) {
+  const hasKey = typeof saJson === 'string' && saJson.trim().startsWith('{');
+  if (!hasKey) {
+    return `GOOGLE WORKSPACE (Google Docs/Sheets/Slides/Drive): no credentials are configured, so you CANNOT access Google APIs. If the task asks for a Google Doc, generate the equivalent local file instead (.docx / .xlsx / .pptx) and say so in the summary.`;
+  }
+  return [
+    `GOOGLE WORKSPACE TASKS (Google Docs / Sheets / Slides / Drive):`,
+    `- A service-account key file ALREADY EXISTS at \`.google-sa.json\` in the current directory. Do NOT create it, do NOT echo its contents. Authenticate with the \`googleapis\` library: \`const { google } = require('googleapis'); const auth = new google.auth.GoogleAuth({ keyFile: '.google-sa.json', scopes: ['https://www.googleapis.com/auth/documents','https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/presentations','https://www.googleapis.com/auth/drive'] });\``,
+    `- Install once: \`npm install googleapis\`. Then: docs -> \`google.docs({version:'v1',auth})\` (\`documents.get\` to read, \`documents.batchUpdate\` to insert text/images); Sheets -> \`google.sheets({version:'v4',auth})\`; Slides -> \`google.slides({version:'v1',auth})\`; Drive (upload/download/export PDF) -> \`google.drive({version:'v3',auth})\`.`,
+    `- Extract the document/file ID from URLs: https://docs.google.com/document/d/<ID>/edit -> ID is the segment after /d/. Works the same for /spreadsheets/d/, /presentation/d/, /file/d/.`,
+    `- The documents the user shares are ALREADY shared with the service account. If you hit 403 PERMISSION_DENIED anyway, report it in the summary — do NOT invent workarounds or retry endlessly.`,
+    `- To export a Google Doc as PDF/Word/Excel: use Drive API \`files.export\` (docs -> application/pdf, spreadsheets -> application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, presentations -> application/vnd.openxmlformats-officedocument.presentationml.presentation) and save the bytes to a local file.`,
+    `- To create a NEW Google Doc/Sheet/Slide in the user's Drive: create via the respective API (e.g. \`docs.documents.create\`), then use Drive API \`permissions.create\` with \`role:'reader'\` and \`type:'anyone'\` to make it link-viewable, and print the resulting URL. If creating via API fails, fall back to building the local .docx/.xlsx/.pptx file instead.`,
+    `- When the task is about Google Workspace, the deliverable is the CHANGE IN GOOGLE (or a downloaded export) — say exactly which doc/URL you touched in the final summary.`,
+  ].join('\n');
+}
+
 export async function POST(request) {
   try {
     const { sessionId, taskId } = await request.json();
@@ -113,6 +136,7 @@ export async function POST(request) {
       `- Fill it with the real content the goal asks for. Never ship an empty template or lorem-ipsum rows.`,
       `- At the end, print the exact filename(s) you produced so the user knows what to download.`,
       `- When the task is fully done, end IMMEDIATELY with a short summary of the concrete files you created/changed. Do not keep exploring after the deliverable exists.`,
+      buildGoogleRules(settings.googleServiceAccountJson),
     ].join('\n');
 
     // Match on THIS task only. Matching the goal too meant that a goal like
@@ -172,6 +196,24 @@ export async function POST(request) {
           const workspaceName = await resolveWorkspaceName(sessionId);
           const workspaceDir = path.join(process.cwd(), 'workspaces', workspaceName);
           await fs.mkdir(workspaceDir, { recursive: true });
+
+          // Materialize the service-account key into the workspace only for
+          // Google-related tasks, so unrelated runs never touch credentials.
+          // Dot-prefixed name keeps it out of the FileBrowser listing.
+          const googleRelevant = GOOGLE_DOC_RE.test(
+            `${currentTask.description || ''}\n${session.goal || ''}`,
+          );
+          if (googleRelevant && typeof settings.googleServiceAccountJson === 'string' && settings.googleServiceAccountJson.trim().startsWith('{')) {
+            try {
+              await fs.writeFile(
+                path.join(workspaceDir, '.google-sa.json'),
+                settings.googleServiceAccountJson,
+                { mode: 0o600 },
+              );
+            } catch (e) {
+              sendEvent('log', { message: `⚠️ Gagal menulis .google-sa.json: ${e.message}` });
+            }
+          }
 
           sendEvent('log', { message: `🚀 Menjalankan OpenCode untuk task: ${currentTask.description}` });
           sendEvent('log', { message: `📁 Workspace: workspaces/${workspaceName}` });

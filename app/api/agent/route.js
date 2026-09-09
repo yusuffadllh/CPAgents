@@ -73,6 +73,8 @@ FIDELITY: carry the user's literal details into the task descriptions — exact 
 
 DOCUMENT DELIVERABLES: if the goal asks for a PDF, Excel/spreadsheet, Word, PowerPoint, CSV or chart, the tasks must produce the REAL file in that format — say so explicitly (e.g. "Generate laporan-penjualan.xlsx using exceljs, with sheets X and Y"). Never substitute a Markdown or plain-text file for a requested document format. Split content preparation and file generation into separate tasks only when the content is substantial.
 
+GOOGLE WORKSPACE: if the goal contains a Google Docs/Sheets/Slides/Drive link (docs.google.com) or asks to create/edit/export a Google Doc, Sheet or Slide, write the task descriptions so the executor targets the Google document DIRECTLY (include the literal URL and what to do: read, edit, append a section, export to PDF, etc). A Google service-account key is configured server-side and is injected automatically — do NOT ask the user to upload a key or set up credentials. Only if the goal asks for an OFFLINE document with no Google link should you produce local .docx/.xlsx/.pptx files.
+
 You MUST respond with ONLY a valid JSON array of objects. Format: [{"description": "task 1"}, {"description": "task 2"}]`;
 
     // Call gateway for Planner, retrying on transient 429/5xx ("busy").

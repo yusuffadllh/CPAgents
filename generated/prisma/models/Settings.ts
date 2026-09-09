@@ -42,6 +42,11 @@ export type SettingsMinAggregateOutputType = {
   imageModelName: string | null
   vercelToken: string | null
   netlifyToken: string | null
+  githubToken: string | null
+  githubUsername: string | null
+  githubEmail: string | null
+  deployMode: string | null
+  googleServiceAccountJson: string | null
 }
 
 export type SettingsMaxAggregateOutputType = {
@@ -52,6 +57,11 @@ export type SettingsMaxAggregateOutputType = {
   imageModelName: string | null
   vercelToken: string | null
   netlifyToken: string | null
+  githubToken: string | null
+  githubUsername: string | null
+  githubEmail: string | null
+  deployMode: string | null
+  googleServiceAccountJson: string | null
 }
 
 export type SettingsCountAggregateOutputType = {
@@ -62,6 +72,11 @@ export type SettingsCountAggregateOutputType = {
   imageModelName: number
   vercelToken: number
   netlifyToken: number
+  githubToken: number
+  githubUsername: number
+  githubEmail: number
+  deployMode: number
+  googleServiceAccountJson: number
   _all: number
 }
 
@@ -82,6 +97,11 @@ export type SettingsMinAggregateInputType = {
   imageModelName?: true
   vercelToken?: true
   netlifyToken?: true
+  githubToken?: true
+  githubUsername?: true
+  githubEmail?: true
+  deployMode?: true
+  googleServiceAccountJson?: true
 }
 
 export type SettingsMaxAggregateInputType = {
@@ -92,6 +112,11 @@ export type SettingsMaxAggregateInputType = {
   imageModelName?: true
   vercelToken?: true
   netlifyToken?: true
+  githubToken?: true
+  githubUsername?: true
+  githubEmail?: true
+  deployMode?: true
+  googleServiceAccountJson?: true
 }
 
 export type SettingsCountAggregateInputType = {
@@ -102,6 +127,11 @@ export type SettingsCountAggregateInputType = {
   imageModelName?: true
   vercelToken?: true
   netlifyToken?: true
+  githubToken?: true
+  githubUsername?: true
+  githubEmail?: true
+  deployMode?: true
+  googleServiceAccountJson?: true
   _all?: true
 }
 
@@ -199,6 +229,11 @@ export type SettingsGroupByOutputType = {
   imageModelName: string
   vercelToken: string
   netlifyToken: string
+  githubToken: string
+  githubUsername: string
+  githubEmail: string
+  deployMode: string
+  googleServiceAccountJson: string
   _count: SettingsCountAggregateOutputType | null
   _avg: SettingsAvgAggregateOutputType | null
   _sum: SettingsSumAggregateOutputType | null
@@ -232,6 +267,11 @@ export type SettingsWhereInput = {
   imageModelName?: Prisma.StringFilter<"Settings"> | string
   vercelToken?: Prisma.StringFilter<"Settings"> | string
   netlifyToken?: Prisma.StringFilter<"Settings"> | string
+  githubToken?: Prisma.StringFilter<"Settings"> | string
+  githubUsername?: Prisma.StringFilter<"Settings"> | string
+  githubEmail?: Prisma.StringFilter<"Settings"> | string
+  deployMode?: Prisma.StringFilter<"Settings"> | string
+  googleServiceAccountJson?: Prisma.StringFilter<"Settings"> | string
 }
 
 export type SettingsOrderByWithRelationInput = {
@@ -242,6 +282,11 @@ export type SettingsOrderByWithRelationInput = {
   imageModelName?: Prisma.SortOrder
   vercelToken?: Prisma.SortOrder
   netlifyToken?: Prisma.SortOrder
+  githubToken?: Prisma.SortOrder
+  githubUsername?: Prisma.SortOrder
+  githubEmail?: Prisma.SortOrder
+  deployMode?: Prisma.SortOrder
+  googleServiceAccountJson?: Prisma.SortOrder
 }
 
 export type SettingsWhereUniqueInput = Prisma.AtLeast<{
@@ -255,6 +300,11 @@ export type SettingsWhereUniqueInput = Prisma.AtLeast<{
   imageModelName?: Prisma.StringFilter<"Settings"> | string
   vercelToken?: Prisma.StringFilter<"Settings"> | string
   netlifyToken?: Prisma.StringFilter<"Settings"> | string
+  githubToken?: Prisma.StringFilter<"Settings"> | string
+  githubUsername?: Prisma.StringFilter<"Settings"> | string
+  githubEmail?: Prisma.StringFilter<"Settings"> | string
+  deployMode?: Prisma.StringFilter<"Settings"> | string
+  googleServiceAccountJson?: Prisma.StringFilter<"Settings"> | string
 }, "id">
 
 export type SettingsOrderByWithAggregationInput = {
@@ -265,6 +315,11 @@ export type SettingsOrderByWithAggregationInput = {
   imageModelName?: Prisma.SortOrder
   vercelToken?: Prisma.SortOrder
   netlifyToken?: Prisma.SortOrder
+  githubToken?: Prisma.SortOrder
+  githubUsername?: Prisma.SortOrder
+  githubEmail?: Prisma.SortOrder
+  deployMode?: Prisma.SortOrder
+  googleServiceAccountJson?: Prisma.SortOrder
   _count?: Prisma.SettingsCountOrderByAggregateInput
   _avg?: Prisma.SettingsAvgOrderByAggregateInput
   _max?: Prisma.SettingsMaxOrderByAggregateInput
@@ -283,6 +338,11 @@ export type SettingsScalarWhereWithAggregatesInput = {
   imageModelName?: Prisma.StringWithAggregatesFilter<"Settings"> | string
   vercelToken?: Prisma.StringWithAggregatesFilter<"Settings"> | string
   netlifyToken?: Prisma.StringWithAggregatesFilter<"Settings"> | string
+  githubToken?: Prisma.StringWithAggregatesFilter<"Settings"> | string
+  githubUsername?: Prisma.StringWithAggregatesFilter<"Settings"> | string
+  githubEmail?: Prisma.StringWithAggregatesFilter<"Settings"> | string
+  deployMode?: Prisma.StringWithAggregatesFilter<"Settings"> | string
+  googleServiceAccountJson?: Prisma.StringWithAggregatesFilter<"Settings"> | string
 }
 
 export type SettingsCreateInput = {
@@ -293,6 +353,11 @@ export type SettingsCreateInput = {
   imageModelName?: string
   vercelToken?: string
   netlifyToken?: string
+  githubToken?: string
+  githubUsername?: string
+  githubEmail?: string
+  deployMode?: string
+  googleServiceAccountJson?: string
 }
 
 export type SettingsUncheckedCreateInput = {
@@ -303,6 +368,11 @@ export type SettingsUncheckedCreateInput = {
   imageModelName?: string
   vercelToken?: string
   netlifyToken?: string
+  githubToken?: string
+  githubUsername?: string
+  githubEmail?: string
+  deployMode?: string
+  googleServiceAccountJson?: string
 }
 
 export type SettingsUpdateInput = {
@@ -313,6 +383,11 @@ export type SettingsUpdateInput = {
   imageModelName?: Prisma.StringFieldUpdateOperationsInput | string
   vercelToken?: Prisma.StringFieldUpdateOperationsInput | string
   netlifyToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  githubEmail?: Prisma.StringFieldUpdateOperationsInput | string
+  deployMode?: Prisma.StringFieldUpdateOperationsInput | string
+  googleServiceAccountJson?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type SettingsUncheckedUpdateInput = {
@@ -323,6 +398,11 @@ export type SettingsUncheckedUpdateInput = {
   imageModelName?: Prisma.StringFieldUpdateOperationsInput | string
   vercelToken?: Prisma.StringFieldUpdateOperationsInput | string
   netlifyToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  githubEmail?: Prisma.StringFieldUpdateOperationsInput | string
+  deployMode?: Prisma.StringFieldUpdateOperationsInput | string
+  googleServiceAccountJson?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type SettingsCreateManyInput = {
@@ -333,6 +413,11 @@ export type SettingsCreateManyInput = {
   imageModelName?: string
   vercelToken?: string
   netlifyToken?: string
+  githubToken?: string
+  githubUsername?: string
+  githubEmail?: string
+  deployMode?: string
+  googleServiceAccountJson?: string
 }
 
 export type SettingsUpdateManyMutationInput = {
@@ -343,6 +428,11 @@ export type SettingsUpdateManyMutationInput = {
   imageModelName?: Prisma.StringFieldUpdateOperationsInput | string
   vercelToken?: Prisma.StringFieldUpdateOperationsInput | string
   netlifyToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  githubEmail?: Prisma.StringFieldUpdateOperationsInput | string
+  deployMode?: Prisma.StringFieldUpdateOperationsInput | string
+  googleServiceAccountJson?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type SettingsUncheckedUpdateManyInput = {
@@ -353,6 +443,11 @@ export type SettingsUncheckedUpdateManyInput = {
   imageModelName?: Prisma.StringFieldUpdateOperationsInput | string
   vercelToken?: Prisma.StringFieldUpdateOperationsInput | string
   netlifyToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubToken?: Prisma.StringFieldUpdateOperationsInput | string
+  githubUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  githubEmail?: Prisma.StringFieldUpdateOperationsInput | string
+  deployMode?: Prisma.StringFieldUpdateOperationsInput | string
+  googleServiceAccountJson?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type SettingsCountOrderByAggregateInput = {
@@ -363,6 +458,11 @@ export type SettingsCountOrderByAggregateInput = {
   imageModelName?: Prisma.SortOrder
   vercelToken?: Prisma.SortOrder
   netlifyToken?: Prisma.SortOrder
+  githubToken?: Prisma.SortOrder
+  githubUsername?: Prisma.SortOrder
+  githubEmail?: Prisma.SortOrder
+  deployMode?: Prisma.SortOrder
+  googleServiceAccountJson?: Prisma.SortOrder
 }
 
 export type SettingsAvgOrderByAggregateInput = {
@@ -377,6 +477,11 @@ export type SettingsMaxOrderByAggregateInput = {
   imageModelName?: Prisma.SortOrder
   vercelToken?: Prisma.SortOrder
   netlifyToken?: Prisma.SortOrder
+  githubToken?: Prisma.SortOrder
+  githubUsername?: Prisma.SortOrder
+  githubEmail?: Prisma.SortOrder
+  deployMode?: Prisma.SortOrder
+  googleServiceAccountJson?: Prisma.SortOrder
 }
 
 export type SettingsMinOrderByAggregateInput = {
@@ -387,6 +492,11 @@ export type SettingsMinOrderByAggregateInput = {
   imageModelName?: Prisma.SortOrder
   vercelToken?: Prisma.SortOrder
   netlifyToken?: Prisma.SortOrder
+  githubToken?: Prisma.SortOrder
+  githubUsername?: Prisma.SortOrder
+  githubEmail?: Prisma.SortOrder
+  deployMode?: Prisma.SortOrder
+  googleServiceAccountJson?: Prisma.SortOrder
 }
 
 export type SettingsSumOrderByAggregateInput = {
@@ -415,6 +525,11 @@ export type SettingsSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   imageModelName?: boolean
   vercelToken?: boolean
   netlifyToken?: boolean
+  githubToken?: boolean
+  githubUsername?: boolean
+  githubEmail?: boolean
+  deployMode?: boolean
+  googleServiceAccountJson?: boolean
 }, ExtArgs["result"]["settings"]>
 
 export type SettingsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -425,6 +540,11 @@ export type SettingsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   imageModelName?: boolean
   vercelToken?: boolean
   netlifyToken?: boolean
+  githubToken?: boolean
+  githubUsername?: boolean
+  githubEmail?: boolean
+  deployMode?: boolean
+  googleServiceAccountJson?: boolean
 }, ExtArgs["result"]["settings"]>
 
 export type SettingsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -435,6 +555,11 @@ export type SettingsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   imageModelName?: boolean
   vercelToken?: boolean
   netlifyToken?: boolean
+  githubToken?: boolean
+  githubUsername?: boolean
+  githubEmail?: boolean
+  deployMode?: boolean
+  googleServiceAccountJson?: boolean
 }, ExtArgs["result"]["settings"]>
 
 export type SettingsSelectScalar = {
@@ -445,9 +570,14 @@ export type SettingsSelectScalar = {
   imageModelName?: boolean
   vercelToken?: boolean
   netlifyToken?: boolean
+  githubToken?: boolean
+  githubUsername?: boolean
+  githubEmail?: boolean
+  deployMode?: boolean
+  googleServiceAccountJson?: boolean
 }
 
-export type SettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "baseUrl" | "apiKey" | "modelName" | "imageModelName" | "vercelToken" | "netlifyToken", ExtArgs["result"]["settings"]>
+export type SettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "baseUrl" | "apiKey" | "modelName" | "imageModelName" | "vercelToken" | "netlifyToken" | "githubToken" | "githubUsername" | "githubEmail" | "deployMode" | "googleServiceAccountJson", ExtArgs["result"]["settings"]>
 
 export type $SettingsPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Settings"
@@ -460,6 +590,11 @@ export type $SettingsPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     imageModelName: string
     vercelToken: string
     netlifyToken: string
+    githubToken: string
+    githubUsername: string
+    githubEmail: string
+    deployMode: string
+    googleServiceAccountJson: string
   }, ExtArgs["result"]["settings"]>
   composites: {}
 }
@@ -890,6 +1025,11 @@ export interface SettingsFieldRefs {
   readonly imageModelName: Prisma.FieldRef<"Settings", 'String'>
   readonly vercelToken: Prisma.FieldRef<"Settings", 'String'>
   readonly netlifyToken: Prisma.FieldRef<"Settings", 'String'>
+  readonly githubToken: Prisma.FieldRef<"Settings", 'String'>
+  readonly githubUsername: Prisma.FieldRef<"Settings", 'String'>
+  readonly githubEmail: Prisma.FieldRef<"Settings", 'String'>
+  readonly deployMode: Prisma.FieldRef<"Settings", 'String'>
+  readonly googleServiceAccountJson: Prisma.FieldRef<"Settings", 'String'>
 }
     
 

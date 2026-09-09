@@ -759,7 +759,12 @@ export const SettingsScalarFieldEnum = {
   modelName: 'modelName',
   imageModelName: 'imageModelName',
   vercelToken: 'vercelToken',
-  netlifyToken: 'netlifyToken'
+  netlifyToken: 'netlifyToken',
+  githubToken: 'githubToken',
+  githubUsername: 'githubUsername',
+  githubEmail: 'githubEmail',
+  deployMode: 'deployMode',
+  googleServiceAccountJson: 'googleServiceAccountJson'
 } as const
 
 export type SettingsScalarFieldEnum = (typeof SettingsScalarFieldEnum)[keyof typeof SettingsScalarFieldEnum]
@@ -768,6 +773,7 @@ export type SettingsScalarFieldEnum = (typeof SettingsScalarFieldEnum)[keyof typ
 export const SessionScalarFieldEnum = {
   id: 'id',
   goal: 'goal',
+  slug: 'slug',
   createdAt: 'createdAt'
 } as const
 

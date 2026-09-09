@@ -30,7 +30,7 @@ export async function POST(request) {
   try {
     const {
       baseUrl, apiKey, modelName, imageModelName, vercelToken, netlifyToken,
-      githubToken, githubUsername, githubEmail, deployMode,
+      githubToken, githubUsername, githubEmail, deployMode, googleServiceAccountJson,
     } = await request.json();
 
     const data = { baseUrl, apiKey, modelName };
@@ -39,6 +39,7 @@ export async function POST(request) {
     // doesn't wipe previously stored credentials.
     if (vercelToken !== undefined) data.vercelToken = vercelToken;
     if (netlifyToken !== undefined) data.netlifyToken = netlifyToken;
+    if (googleServiceAccountJson !== undefined) data.googleServiceAccountJson = googleServiceAccountJson;
     if (githubToken !== undefined) data.githubToken = githubToken;
     if (githubUsername !== undefined) data.githubUsername = githubUsername;
     if (githubEmail !== undefined) data.githubEmail = githubEmail;

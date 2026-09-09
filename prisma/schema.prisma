@@ -32,6 +32,13 @@ model Settings {
   // "git"  = push to GitHub only and let the platform's Git integration build,
   //          which avoids the duplicate deployment you get when both run.
   deployMode String @default("cli")
+
+  // Google service-account JSON (full key file content) used by the agent to
+  // read/write Google Docs, Sheets, Slides, Drive files, etc. Empty means the
+  // Google integrations are unavailable. Stored as-is; the executor writes it
+  // to a temp file in the workspace and points GOOGLE_APPLICATION_CREDENTIALS
+  // at it.
+  googleServiceAccountJson String @default("")
 }
 
 model Session {
