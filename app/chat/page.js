@@ -253,6 +253,9 @@ export default function ChatPage() {
     const userMsg = message;
     const attachments = pendingAttachments;
     setMessage('');
+    // Reset tinggi textarea yang di-grow manual.
+    const ta = document.querySelector('.input-box textarea');
+    if (ta) ta.style.height = 'auto';
     setPendingAttachments([]);
     setMessages(prev => [...prev, { role: 'user', content: userMsg, attachments }]);
     setIsLoading(true);
@@ -448,12 +451,27 @@ export default function ChatPage() {
           </div>
 
           <div className="input-box">
-            <input 
-              type="text" 
-              placeholder={imageMode ? 'Deskripsikan gambar yang ingin dibuat...' : 'Ketik pesan Anda di sini...'} 
+            <textarea
+              placeholder={imageMode ? 'Deskripsikan gambar yang ingin dibuat...' : 'Ketik pesan Anda di sini... (Enter kirim, Shift+Enter baris baru)'}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              rows={1}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                // Auto-grow seperti di agent mode, dibatasi max-height dari CSS.
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              onInput={(e) => {
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+              }}
+              style={{ overflowY: 'auto' }}
             />
             <button onClick={handleSend} disabled={isLoading || isUploading}>
               {isLoading ? '...' : imageMode ? 'Generate' : 'Kirim'}
