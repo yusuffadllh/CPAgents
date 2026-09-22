@@ -31,6 +31,7 @@ export async function POST(request) {
     const {
       baseUrl, apiKey, modelName, imageModelName, vercelToken, netlifyToken,
       githubToken, githubUsername, githubEmail, deployMode, googleServiceAccountJson,
+      tavilyApiKey,
     } = await request.json();
 
     const data = { baseUrl, apiKey, modelName };
@@ -40,6 +41,7 @@ export async function POST(request) {
     if (vercelToken !== undefined) data.vercelToken = vercelToken;
     if (netlifyToken !== undefined) data.netlifyToken = netlifyToken;
     if (googleServiceAccountJson !== undefined) data.googleServiceAccountJson = googleServiceAccountJson;
+    if (tavilyApiKey !== undefined) data.tavilyApiKey = tavilyApiKey;
     if (githubToken !== undefined) data.githubToken = githubToken;
     if (githubUsername !== undefined) data.githubUsername = githubUsername;
     if (githubEmail !== undefined) data.githubEmail = githubEmail;

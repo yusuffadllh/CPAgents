@@ -148,7 +148,25 @@ export default function SettingsModal({ settings, setSettings, onSave, onCancel 
         </div>
 
         <div style={{ borderTop: '1px solid var(--surface-border)', margin: '0.5rem 0 1rem', paddingTop: '1rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', opacity: 0.85 }}>🐙 GitHub (opsional)</div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', opacity: 0.85 }}>� Web Search — Tavily (opsional)</div>
+
+          <div style={{ marginBottom: '0.25rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Tavily API Key</label>
+            <input
+              type="password"
+              placeholder="tvly-... (dari app.tavily.com)"
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--surface-border)', color: 'white' }}
+              value={settings.tavilyApiKey || ''}
+              onChange={e => setSettings({ ...settings, tavilyApiKey: e.target.value })}
+            />
+            <small style={{ display: 'block', marginTop: '0.5rem', opacity: 0.6 }}>
+              Diisi agar mode chat bisa mencari info terkini di web. Kalau kosong, fitur search otomatis nonaktif.
+            </small>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--surface-border)', margin: '0.5rem 0 1rem', paddingTop: '1rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', opacity: 0.85 }}>�🐙 GitHub (opsional)</div>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Personal Access Token</label>

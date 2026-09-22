@@ -39,6 +39,10 @@ model Settings {
   // to a temp file in the workspace and points GOOGLE_APPLICATION_CREDENTIALS
   // at it.
   googleServiceAccountJson String @default("")
+
+  // Tavily API key — powers the web-search tool in chat mode. When set, the
+  // model can request live web results by emitting a <<<SEARCH: query>>> block.
+  tavilyApiKey String @default("")
 }
 
 model Session {

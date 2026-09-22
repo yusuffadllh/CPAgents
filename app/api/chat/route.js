@@ -42,7 +42,67 @@ Aturan dokumen:
 - Nama file harus memakai ekstensi yang sesuai dengan tipe blok.
 - Gambar tidak didukung di dokumen; sajikan sebagai tabel atau teks.
 - Batas: maksimal 10 dokumen per jawaban, 20.000 baris per tabel, 64 kolom, dan 100 MB per file. Data di atas batas akan dipotong, jadi ringkas bila perlu.
+
+WEB SEARCH:
+Kamu bisa mencari informasi TERKINI di web dengan mengeluarkan blok PERSIS berikut:
+
+<<<SEARCH: kata kunci pencarian>>>
+
+Aturan search:
+- Hanya gunakan blok ini bila pertanyaan butuh info terkini/terbaru, spesifik, atau fakta yang mungkin berubah (berita, harga, jadwal, versi software, dst).
+- Boleh beberapa blok dalam satu jawaban untuk pencarian berbeda.
+- Sistem akan menjalankan pencarian dan mengirim hasilnya kembali; jangan mengarang hasil pencarian sendiri.
+- Setelah hasil diterima (di pesan berikutnya), jawab pengguna dengan menyebut sumber (URL) yang relevan.
 Jawab dalam bahasa yang sama dengan pengguna.`;
+
+// Extract <<<SEARCH: query>>> blocks from an assistant reply.
+function parseSearchBlocks(text) {
+  const queries = [];
+  const re = /<<<SEARCH:\s*([\s\S]+?)\s*>>>/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const q = m[1].trim();
+    if (q) queries.push(q);
+  }
+  return [...new Set(queries)].slice(0, 3); // dedupe, max 3 queries per turn
+}
+
+// Run web searches via the Tavily REST API. Returns null when no key is
+// configured (feature off) so the caller can answer without searching.
+async function runWebSearch(apiKey, queries) {
+  if (!apiKey) return null;
+  const results = [];
+  for (const q of queries) {
+    try {
+      const res = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: apiKey,
+          query: q,
+          max_results: 5,
+          search_depth: 'basic',
+          include_answer: true,
+        }),
+      });
+      if (!res.ok) {
+        results.push({ query: q, error: `Tavily HTTP ${res.status}` });
+        continue;
+      }
+      const data = await res.json();
+      results.push({
+        query: q,
+        answer: data.answer || '',
+        sources: (data.results || []).map((r) => ({
+          title: r.title, url: r.url, content: (r.content || '').slice(0, 700),
+        })),
+      });
+    } catch (e) {
+      results.push({ query: q, error: e.message });
+    }
+  }
+  return results;
+}
 
 // Extract <<<FILE: name>>> ... <<<END>>> blocks from an assistant reply.
 function parseFileBlocks(text) {
@@ -196,6 +256,50 @@ export async function POST(request) {
     let assistantContent = data.choices && data.choices[0] && data.choices[0].message 
       ? data.choices[0].message.content 
       : JSON.stringify(data);
+
+    // --- Web search tool loop ---------------------------------------------
+    // If the model requested searches, run them via Tavily and feed the
+    // results back for a final answer. Max 2 rounds to keep latency bounded.
+    const searchHistory = [...openRouterMessages];
+    let round = 0;
+    while (round < 2) {
+      const queries = parseSearchBlocks(assistantContent);
+      if (queries.length === 0) break;
+      if (!settings.tavilyApiKey) {
+        // Feature off: tell the model to answer from its own knowledge.
+        searchHistory.push({ role: 'assistant', content: assistantContent });
+        searchHistory.push({ role: 'user', content: '(Web search tidak tersedia — jawab dengan pengetahuanmu sendiri tanpa blok SEARCH.)' });
+      } else {
+        const results = await runWebSearch(settings.tavilyApiKey, queries);
+        searchHistory.push({ role: 'assistant', content: assistantContent });
+        searchHistory.push({
+          role: 'user',
+          content: 'HASIL WEB SEARCH (JSON):\n' + JSON.stringify(results)
+            + '\n\nGunakan hasil di atas untuk menjawab pertanyaan pengguna. Sebutkan sumber (URL) yang relevan. Jangan keluarkan blok SEARCH lagi.',
+        });
+      }
+
+      const followRes = await fetchChatWithRetry(`${settings.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${settings.apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'AI Chat App',
+        },
+        body: JSON.stringify({
+          model: settings.modelName || 'google/gemini-2.5-pro',
+          messages: searchHistory,
+        })
+      });
+
+      if (!followRes.ok) break; // keep the original reply on follow-up failure
+
+      const followData = parseChatCompletion(await followRes.text());
+      if (!followData?.choices?.[0]?.message?.content) break;
+      assistantContent = followData.choices[0].message.content;
+      round++;
+    }
 
     // If the model emitted file blocks, write them to disk and expose as
     // downloadable attachments. Replace the raw blocks with a short note.
