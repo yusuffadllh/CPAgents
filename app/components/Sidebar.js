@@ -161,7 +161,7 @@ export default function Sidebar({ setShowSettings, currentMode, sessions = [], o
       </button>
       
       <div style={{ marginTop: 'auto', fontSize: '0.8rem', opacity: 0.6 }}>
-        Antigravity UI Clone
+        Ucup AI
       </div>
     </div>
   );

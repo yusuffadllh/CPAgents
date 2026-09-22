@@ -713,7 +713,7 @@ export default function Home() {
             
             <div className="glass" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
               <h1 style={{ fontSize: '1.8rem', fontWeight: '800', textAlign: 'center', background: 'linear-gradient(90deg, #bb86fc, #90caf9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                Antigravity Agent
+                Ucup AI Agent
               </h1>
 
               {/* Config aktif: berubah otomatis saat baseURL / model / API key diganti. */}
