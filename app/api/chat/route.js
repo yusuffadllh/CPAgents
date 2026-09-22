@@ -147,12 +147,18 @@ export async function POST(request) {
       }
     });
 
-    // Get previous messages for context (last 10)
+    // Get previous messages for context (last 10). Query descending + take,
+    // then reverse, so we keep the MOST RECENT messages (asc + take would
+    // return the oldest 10 and drop the user's latest question entirely).
     const history = await prisma.message.findMany({
       where: { sessionId: session.id },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
       take: 10
     });
+    history.reverse();
 
     const openRouterMessages = [
       { role: 'system', content: SYSTEM_PROMPT },
