@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizeModelName } from '@/lib/context';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
@@ -37,7 +38,7 @@ export async function POST(request) {
       data: { sessionId: session.id, role: 'user', content: `🎨 Generate gambar: ${prompt}` },
     });
 
-    const imageModel = settings.imageModelName || 'gpt-image-1';
+    const imageModel = normalizeModelName(settings.imageModelName, 'gpt-image-1');
     const base = (settings.baseUrl || '').replace(/\/$/, '');
 
     const response = await fetch(`${base}/images/generations`, {

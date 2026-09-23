@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizeModelName } from '@/lib/context';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
@@ -44,7 +45,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Source image not found' }, { status: 404 });
     }
 
-    const imageModel = settings.imageModelName || 'gpt-image-1';
+    const imageModel = normalizeModelName(settings.imageModelName, 'gpt-image-1');
     const apiBase = (settings.baseUrl || '').replace(/\/$/, '');
 
     await prisma.message.create({

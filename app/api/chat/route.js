@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { fetchChatWithRetry, parseChatCompletion } from '@/lib/context';
+import { fetchChatWithRetry, parseChatCompletion, normalizeModelName } from '@/lib/context';
 import { parseDocBlocks, writeDocuments } from '@/lib/documents';
 import { resolveWorkspaceName, isSafeDirName } from '@/lib/workspace';
 import fs from 'fs/promises';
@@ -53,7 +53,12 @@ Aturan search:
 - Boleh beberapa blok dalam satu jawaban untuk pencarian berbeda.
 - Sistem akan menjalankan pencarian dan mengirim hasilnya kembali; jangan mengarang hasil pencarian sendiri.
 - Setelah hasil diterima (di pesan berikutnya), jawab pengguna dengan menyebut sumber (URL) yang relevan.
-Jawab dalam bahasa yang sama dengan pengguna.`;
+Jawab dalam bahasa yang sama dengan pengguna.
+
+VISI (GAMBAR):
+- Gambar yang dikirim pengguna tersedia untukmu sebagai image_url. Jika ADA gambar di konteks, analisis langsung isinya.
+- Jika TIDAK ada gambar sama sekali di percakapan, katakan saja belum ada gambar yang dikirim dan minta pengguna mengunggahnya.
+- JANGAN PERNAH mengarang alasan seperti "Previous image omitted from context" atau "ukuran file terlalu besar" — itu placeholder sistem, bukan kondisi nyata.`;
 
 // Extract <<<SEARCH: query>>> blocks from an assistant reply.
 function parseSearchBlocks(text) {
@@ -235,7 +240,7 @@ export async function POST(request) {
         'X-Title': 'AI Chat App',
       },
       body: JSON.stringify({
-        model: settings.modelName || 'google/gemini-2.5-pro',
+        model: normalizeModelName(settings.modelName),
         messages: openRouterMessages,
       })
     });
@@ -288,7 +293,7 @@ export async function POST(request) {
           'X-Title': 'AI Chat App',
         },
         body: JSON.stringify({
-          model: settings.modelName || 'google/gemini-2.5-pro',
+          model: normalizeModelName(settings.modelName),
           messages: searchHistory,
         })
       });
